@@ -44,6 +44,26 @@ def test_constructor():
     assert spec
 
 
+def test_read_fwf_data():
+
+    spec = HumanFile()
+    with pytest.raises(Exception):
+        df = spec.load_file(DATA)
+
+    with pytest.raises(Exception):
+        spec.READER = None
+        df = spec.load_file(DATA)
+
+    with pytest.raises(Exception):
+        spec.READER = "xxx"
+        df = spec.load_file(DATA)
+
+    spec.READER = "fwf"
+    df = spec.load_file(DATA)
+    assert len(df.index) == 10
+    assert list(df.columns) == list(spec.fieldSpecNames)
+
+
 # Note: On Windows all of your multiprocessing-using code must be guarded by if __name__ == "__main__":
 if __name__ == '__main__':
 

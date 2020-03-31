@@ -14,7 +14,7 @@ import inspect
 import glob
 import logging
 
-from .filespec import BaseFileSpecification
+from .filespec import FileSpecification
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -63,7 +63,7 @@ def findFileSpecClass(filename, exception=True, **kvargs):
 
     clsname = None
     # Sort by filename (== __module__)
-    for elem in sorted(all_subclasses(BaseFileSpecification), key=lambda x: x.__module__):
+    for elem in sorted(all_subclasses(FileSpecification), key=lambda x: x.__module__):
         if elem.matchFilename(filename, **kvargs):
             clsname = elem
             break

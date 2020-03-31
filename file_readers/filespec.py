@@ -51,7 +51,7 @@ class FileSpecification(object):
     # These are defaults that will be added to each reacord if needed within 
     # the file spec
     FIELDSPECS_DEFAULTS = {
-        "dtype": "string"
+        # "dtype": "string"
     }
 
     # This is the most important info that must be provided in the 
@@ -102,7 +102,7 @@ class FileSpecification(object):
         self.FIELDSPECS = self.add_slice_info(self.FIELDSPECS)
 
         self.fieldSpecByName = {spec["name"]: spec for spec in self.FIELDSPECS}
-        self.fieldSpecNames = [x["name"] for x in self.FIELDSPECS]
+        self.fieldSpecNames = self.fieldSpecByName.keys()
 
         if len(self.FIELDSPECS) != len(self.fieldSpecNames):
             names = [x for x in self.fieldSpecNames if self.fieldSpecNames.count(x) > 1]
@@ -317,5 +317,8 @@ class FileSpecification(object):
 
     def load_file(self, file):
         """Use the configured reader and configs to load the file"""
+
+        assert self.READER, f"Missing READER configuration"
+        assert file is not None, f"Parameter 'file' must not be empty"
 
         return exec_reader(self.READER, file, self)

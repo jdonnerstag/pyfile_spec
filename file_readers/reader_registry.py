@@ -7,6 +7,9 @@
 import logging
 
 from .pandas_excel_reader import excel_reader
+from fwf_db import FWFFile
+from fwf_db.fwf_pandas import FWFPandas
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -16,10 +19,16 @@ class ReaderRegistryException(Exception):
     pass
 
 
+def fwf_wrapper(file, filespec):
+    fwf = FWFFile(filespec)
+    with fwf.open(file) as fd:
+        return FWFPandas(fd).to_pandas()
+
+
 _map = {
     "excel": excel_reader,
     "csv": None,    # csv_reader,
-    "fw": None,     # fwf_reader,
+    "fwf": fwf_wrapper,
 }
 
 
