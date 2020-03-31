@@ -1,0 +1,6 @@
+
+#
+# We are using Numpy and Pandas  to create an index on a column in the 
+# fixed-width file, create unique list of values, manage columns
+# tranformed into int32, datetime, whatever, ... 
+pandas
