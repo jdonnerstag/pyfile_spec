@@ -10,7 +10,9 @@ import re
 import os
 import fnmatch
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from typing import Optional, List
 
 from .reader_registry import exec_reader
 
@@ -27,8 +29,8 @@ class FileSpecification(object):
     """A File Reader leverages this File Specification to easily load tabular data.
 
     File Specification includes the following important features:
-    - File Specifications may change but you need to process old and new files. 
-      File Specs support a validity period.
+    - File structure may change over time and hence the Specifications must be adjusted.
+      That is why File Specs support a validity period.
     - File Specs can be used for different input file formats, including excel, CSV
       and fixed width. A set of readers is provided, leveraging the the file spec.
     - Some formats, e.g. excel, require additional configs such as the sheet name. 
@@ -48,72 +50,84 @@ class FileSpecification(object):
       the file spec for configuration and file spec specific logic.
     """
 
-    # These are defaults that will be added to each reacord if needed within 
-    # the file spec
+    # This specification is valid during this timeframe. Entries are 
+    # strings in the form "yyyy-mm-dd"  [<from>, <to>]. Lower and upper
+    # bounds are inclusive, e.g. ["2018-01-01", "2018-12-31"].
+    # Additionally None, True and False are supported
+    ENABLED : Optional[List[str]] = True
+
+    # These are defaults that will be added to each reacord of a filespec
+    # if needed
     FIELDSPECS_DEFAULTS = {
         # "dtype": "string"
     }
 
-    # This is the most important info that must be provided in the 
-    # derived classes
+    # This is the most important info that must be provided. It is the
+    # description of each field in a record. In can be empty in which
+    # case all fields are loaded if possible, e.g. Excel or csv files
+    # with headers. For fwf files it is required. The actually supported
+    # key value pairs depend on the reader. "name" however is mandatory. 
     FIELDSPECS = []
 
-    # This specification is valid during this timeframe. Entries are 
-    # strings in the form "yyyy-mm-dd"  [<from>, <to>]
-    ENABLED = []
-
-    # Files that match this file specification
+    # When searching for file specs by file name, then the file patterns
+    # can be provided here.
     FILE_PATTERN = []
 
-    # Out of the overall files, the pattern that denote full files
+    # If FILE_PATTERN matches full and delta or diff files, then we need a 
+    # way to identify full files. Fill in the file pattern for full files
+    # here.
     FULL_FILES = []
 
-    # Line ending. Please refer to the file readers on how they are using it.
-    SEPARATOR = None
+    # For some file formats (csv, fwfw) the line ending is relevant.
+    NEWLINE = None
 
     # For decoding bytes into string
-    ENCODING = None
+    ENCODING = "utf-8"
 
-    # A comment char, e.g. '#'. Implementation details are with the File Reader
+    # Some readers support comment lines, e.g. fwf and csv
     COMMENTS = None
 
+    # Some readers support skipping the first N rows, e.g. Excel, csv, fwf
+    SKIP_ROWS = None
+
     # Exclude records based on the effective date. By default that is today(), 
-    # but can be any date if 'old' data are needed.
-    EFFECTIVE_DATE_FIELDS = None  # E.g. ("BUSINESS_DATE", None)
+    # but can be any date if data reflecting a specific point in time are needed.
+    # Must be a tuple or list with 3 elements: [<from>, <to>] in the form of
+    # 'YYYYMMDD'
+    EFFECTIVE_DATE_FIELDS = [None, None]  # E.g. ("BUSINESS_DATE", None)
 
     # Exclude records which are not relevant for a specific period (e.g. month)
-    PERIOD_DATE_FIELDS = None     # E.g. ("VALID_FROM", "VALID_TO")
+    PERIOD_DATE_FIELDS = [None, None]     # E.g. ("VALID_FROM", "VALID_TO")
 
     # The file reader 
     READER = None
 
 
     def __init__(self):
+        """Constructor"""
 
-        self.ENCODING = self.ENCODING or "utf-8"
-
-        if len(self.FIELDSPECS) == 0:
-            raise FileSpecificationException("Config error: FIELDSPECS are missing")
-
-        if not isinstance(self.FIELDSPECS, list):
+        if self.FIELDSPECS is not None and not isinstance(self.FIELDSPECS, list):
             raise FileSpecificationException("Parameter 'specs' must be of type 'list'")
 
         self.FIELDSPECS = self.applyDefaults(self.FIELDSPECS, self.FIELDSPECS_DEFAULTS)
-        self.FIELDSPECS = self.add_slice_info(self.FIELDSPECS)
 
+        # This is mostly to allow access by name without iterating over each entry
         self.fieldSpecByName = {spec["name"]: spec for spec in self.FIELDSPECS}
-        self.fieldSpecNames = self.fieldSpecByName.keys()
+
+        # Just a helper. The list of field names (columns) is oftne useful
+        self.fieldSpecNames = list(self.fieldSpecByName.keys())
 
         if len(self.FIELDSPECS) != len(self.fieldSpecNames):
             names = [x for x in self.fieldSpecNames if self.fieldSpecNames.count(x) > 1]
             raise FileSpecificationException(
                 f"Attribute 'name' in fieldspec must be unique: {names}")
-
+        
         self.init()
 
 
     def applyDefaults(self, specs, defaults):
-        '''Apply the defaults to ALL field specs in the list of field specs'''
+        """Apply the defaults to ALL field specs in the list of field specs"""
+
         for spec in specs:
             for k, v in defaults.items():
                 spec.setdefault(k, v)
@@ -121,175 +135,288 @@ class FileSpecification(object):
         return specs
 
 
-    def add_slice_info(self, fieldspecs):
-        """Based on the field width information, determine the slice for each field"""
-
-        startpos = 0
-        for entry in fieldspecs:
-            if ("len" not in entry) and ("slice" not in entry):
-                raise Exception(
-                    f"Fieldspecs is missing either 'len' or 'slice': {entry}")
-
-            if ("len" in entry) and ("slice" in entry):
-                continue
-                #raise Exception(
-                #    f"Only one must be present in a fieldspec, len or slice: {entry}")
-
-            if "len" in entry:
-                flen = entry["len"]
-                if (flen <= 0) or (flen > 10000):
-                    raise Exception(
-                        f"Fieldspec: Invalid value for len: {entry}")
-
-                entry["slice"] = slice(startpos, startpos + flen)
-                startpos += flen
-            else:
-                fslice = entry["slice"]
-                startpos = fslice.stop
-
-        return fieldspecs
-
-
-    # For easy extension by subclasses
     def init(self):
+        """For easy extension by subclasses"""
         pass
 
 
     def __getitem__(self, name):
+        """Access the field spec by name"""
+        return self.fieldspec(name)
+
+
+    def fieldspec(self, name):
+        """Access field spec for a specific column"""
         if isinstance(name, int):
             name = self.fieldSpecNames[name]
 
         return self.fieldSpecByName[name]
 
 
-    def fieldspec(self, name):
-        return self.fieldSpecByName[name]
-
-
     def __iter__(self):
+        """Iterate over all field specs""" 
         return iter(self.fieldSpecByName.items())
 
 
-    def is_specification_active(self, date):
-        if not (date and self.ENABLED):
+    def keys(self):
+        """Get the list of field names"""
+        return self.fieldSpecNames
+
+
+    def __len__(self):
+        """The number of fields"""
+        return len(self.fieldSpecNames)
+
+
+    def is_specification_active(self, effective_date):
+        """By analysing the ENABLED variable determine whether the file
+        spec is active (effective_date) or not.
+        """
+
+        if self.ENABLED is True:
             return True
 
-        afrom = self.ENABLED[0].replace("-", "")
-        if len(self.ENABLED) == 1:
-            return afrom <= str(date)
+        if self.ENABLED is False:
+            return False
 
+        if not self.ENABLED:
+            return True
+
+        if not isinstance(self.ENABLED, list) or (len(self.ENABLED) != 2):
+            raise FileSpecificationException(
+                f"'ENABLED' must be of type list [<from>, <until>]: {self.ENABLED}")
+
+        # pylint: disable=not-an-iterable
+        if not all(isinstance(o, str) and (len(o) >= 8) for o in self.ENABLED):
+            raise FileSpecificationException(
+                f"'ENABLED' must be of type list [<from>, <until>] with <from> "
+                f"and <to> in the form of 'YYYY-MM-DD': {self.ENABLED}")
+
+        if effective_date is None:
+            return True
+
+        effective_date = effective_date or datetime.today()
+        if isinstance(effective_date, datetime):
+            effective_date = effective_date.strftime("%Y%m%d")
+        else:
+            effective_date = str(effective_date)
+
+        if not isinstance(effective_date, str) or len(effective_date) != 8:
+            raise FileSpecificationException(
+                f"Parameter 'effective_date' must be either a string or int in the "
+                f"form of 'YYYYMMDD': {effective_date}")
+
+        # pylint: disable=unsubscriptable-object
+        afrom = self.ENABLED[0].replace("-", "") 
         bto = self.ENABLED[1].replace("-", "")
-        return afrom <= str(date) < bto
+
+        if len(afrom) != 8 or len(bto) != 8:
+            raise FileSpecificationException(
+                f"ENABLED <to> and <from> must be of the format 'YYYY-MM-DD': {self.ENABLED}")
+
+        if afrom >= bto:
+            pass    # An accepted approach to disable an filespec
+            # raise FileSpecificationException(
+            #    f"Invalid values: <from> <= <to>': {self.ENABLED}")
+
+        return afrom <= effective_date <= bto
 
 
-    def match_filename(self, file, date=None):
-        if not self.is_specification_active(date):
+    def match_filename(self, file, *, period=None, effective_date=None):
+        """Return true, if this file spec is suitable and applicable
+        for loading the file.
+
+        By subsclassing self.match_file() it is possible for the file spec
+        to provide whatever additional filter needed.
+        """
+
+        if not self.is_specification_active(effective_date):
             return False
 
         return self.fnmatch_multiple(self.FILE_PATTERN, file)
 
 
     def is_full(self, file):
+        """Return true if the file name provided is a full file versus 
+        a delta or diff file.
+        """
         return self.fnmatch_multiple(self.FULL_FILES, file)
 
 
     def fnmatch_multiple(self, pattern, file):
+        """internal: Return true if the file matches any of the pattern"""
+        if pattern is None:
+            return False
+
         if isinstance(pattern, str):
             return self.fnmatch(pattern, file)
 
         return any(self.fnmatch(pat, file) for pat in pattern)
 
 
-    def fnmatch_basename(self, pattern, file):
+    def fnmatch(self, pattern, file):
+        """internal: Return true if the file matches the (single) pattern""" 
+
         fbase = os.path.basename(file)
         if fnmatch.fnmatch(fbase, pattern):
             return True
 
         # Additionally support file name pattern as regex
         file = file.replace("\\", "/")
-        return re.search(pattern, file)
+        pattern = pattern.replace(".", "\\.")
+        pattern = pattern.replace("*", ".*")
+        pattern = pattern.replace("/.*.*/", "(/.*)?/")
+        pattern = r"(^|/)" + pattern
 
-
-    def fnmatch(self, pattern, file):
-        rtn = self.fnmatch_basename(pattern, file)
-        if not rtn:
+        try:
+            pat = re.compile(pattern)
+            return pat.match(file) is not None
+        except:
             return False
 
-        pat_dirs = os.path.dirname(pattern).split(r"\\/")
-        if not pat_dirs:
-            return True
 
-        file_dirs = os.path.dirname(file).split(r"\\/")
-        if len(file_dirs) > len(pat_dirs):
-            return False
-
-        file_dirs = file_dirs[ -len(pat_dirs) : ]
-
-        # Note: the test is case sensitive !!!
-        return all(pat_dirs[i] == file_dirs[i] for i in range(len(pat_dirs)))
+    def _date_from_filename(self, file: str):
+        """Replace in subclass if something else is needed"""        
+        return re.search(r"\.(\d{8,14})\.", file).group(1)
 
 
     def datetime_from_filename(self, file: str, maxlen=None) -> str:
-        """Extract the date or datetime from the filename."""
-        m = re.search(r"\.(\d{8,14})\.", file)
-        if m:
-            rtn = m.group(0)[1:-1]
-            return rtn if maxlen is None else rtn[0:maxlen]
-
-        raise Exception(
-            f"Expected file name to contain timestamp like '.YYYYMMDD(HHMMSS)+.': {file}")
-
-
-    def filter_by_filename_date(self, file, op, date_str):
-        fdate = self.datetime_from_filename(file)
-        if not fdate:
-            return 
-
-        if not date_str:
-            return 
-
-        if getattr(fdate[0:len(date_str)], op)(date_str):
-            return file
-
-
-    def file_filter(self, file, commission_period, effective_date):
-        """Skip files which are not relevant
-
-        E.g.
-        rtn = self.filter_by_filename_date(file, "__lt__", effective_date)
-        rtn = rtn and self.filter_by_filename_date(file, "__ge__", commission_period)
-        return rtn
+        """Determine date or datetime from the filename and throw 
+        exception if not found. Optionally limit the datetime extracted
+        to fewer digits,  e.g. just the date
         """
+
+        try:
+            return self._date_from_filename(file)[0:maxlen]
+        except:
+            raise Exception(
+                f"Expected file name to contain timestamp like '.YYYYMMDD(HHMMSS)+.': {file}")
+
+
+    def effective_date_to_str(self, effective_date):
+
+        if isinstance(effective_date, int):
+            effective_date = str(int)
+        elif isinstance(effective_date, datetime):
+            effective_date = effective_date.strftime("%Y%m%d")
+
+        return effective_date
+
+
+    def period_to_str(self, period):
+        if isinstance(period, int):
+            period = str(int)
+        elif isinstance(period, datetime):
+            period = period.strftime("%Y%m")
+
+        return period
+
+
+    def file_filter(self, file, *, period=None, effective_date=None):
+        """Let's assume the file spec has been identified as applicable for the
+        file, but for a given period or effective date, it might be that the
+        file is not relevant and thus can be skipped.
+
+        This method can be replace or leveraged in a subclass
+        """
+
+        effective_date = self.effective_date_to_str(effective_date)
+        if self.datetime_from_filename(file, 8) > effective_date:
+            return False
+
+        # Sometimes it is useful and possible to pre-filter the files needed
+        # to load by period (e.g. a specific month or quarter), and sometimes
+        # it doesn't make sense. Examples:
+        #
+        # Event files arrive at the same day or week, but close to the date the 
+        # event happened. It may not be possible to limit the file to the exact
+        # files needed, but +- a few days. or weeks may already help.
+        #
+        # Database exports (full or partial), may contain retrospective changes 
+        # relevant for a past period. Hence not the files from that period must 
+        # be applied, but the latest (only restricted by effective date).
+        #
+        # Databases, Excel files etc. may have valid_from and valid_until fields
+        # which determine whether a record is applicable for a period or not.
+        # It is true that (CRM) databases, excel files etc. are occassionaly 
+        #
+        # cleaned of old data (e.g. 2 years). That period also determines how far
+        # back in the past periods can be easily re-processed. Easy means without
+        # any special considerations. By means of setting the effective date, it
+        # is possible select older files which do still contain the old data, 
+        # and thus allows processing them.
+
+        # For the reasons given above, the following lines are disabled. Subclasses
+        # may add their own logic if needed.
+        # period = self.period_to_str(period)
+        # return self.datetime_from_filename(file, 6) <= period
 
         return True
 
 
-    def record_filter(self, rec, commission_period, effective_date):
+    def record_filter_by_date(self, rec, fields, date):
+        if not fields or not date:
+            return True
+
+        (ffrom, fto) = fields
+
+        if fto and (rec[fto][0 : len(date)] < date):
+            return False
+
+        if ffrom and (rec[ffrom][0 : len(date)] > date):
+            return False
+
+        return True
+
+
+    def record_filter_by_period(self, rec, fields, period_str):
+        """This is just a default implementation which does not cover all use cases.
+        Subclasses may replace it with their own logic.
+
+        Assuming a period is like "YYYYMM" denoting a specific month, then it
+        matches when the first bytes/chars in the date string found in the 
+        record, match the period_str provided.
+        """
+        return self.record_filter_by_date(rec, fields, period_str)
+
+
+    def record_filter(self, rec, period, effective_date):
         """Skip records which are not relevant
         
         NOTE: This method is sensitive to the performance of reading a file, 
         especially large files with millions of records. This method will be
-        invoked for each record in that file. But sometime the data don't 
-        fit into memory and must be filtered while being loaded.
+        invoked for each record in that file upon reading. But sometime the 
+        data don't fit into memory and must be filtered while being loaded.
 
         The default implementation is rather generic and hence not the fastest
         """
-        ffrom = self.EFFECTIVE_DATE_FIELDS[0]
-        if ffrom and (rec[ffrom] > effective_date):
+        rtn = self.record_filter_by_date(rec, self.EFFECTIVE_DATE_FIELDS, effective_date)
+        if not rtn:
             return False
 
-        fto = self.PERIOD_DATE_FIELDS[1]
-        ffrom = self.PERIOD_DATE_FIELDS[0]
-
-        if fto and not ffrom:
-            return rec[fto] > commission_period
-        elif not fto and ffrom:
-            return rec[ffrom] <= commission_period
-        else:
-            return rec[ffrom] <= commission_period < rec[fto]
+        return self.record_filter_by_period(rec, self.PERIOD_DATE_FIELDS, period)
 
 
-    def df_filter(self, df, commission_period, effective_date):
+    def date_to_field_dtype(self, df, field, date):
+        """Given a dataframe and the dtype of a field, cast the 'date' argument
+        so that it can be compared the dataframe field.
+        """
+
+        if (field 
+            and df[field].dtype.name.startswith("int") 
+            and isinstance(date, datetime)):
+
+            date = int(date.strftime("%Y%m%d"))
+        elif (field 
+            and df[field].dtype.name.startswith("datetime64") 
+            and isinstance(date, int)):
+
+            date = datetime(int(date / 10000), int(date / 100) % 100, date % 100)
+
+        return date
+
+
+    def df_filter(self, df, period, effective_date):
         """Skip records which are not relevant.
 
         File data are loaded into Pandas dataframes. Provided the data 
@@ -297,28 +424,50 @@ class FileSpecification(object):
         unwanted records. That is what this method is about.
 
         Hence it is similar to record_filter() but works on the data
-        AFTER they have been loaded.
+        AFTER they have been loaded. The outcome of both should be the same
+        despite their different implementation.
         """ 
 
-        ffrom = self.EFFECTIVE_DATE_FIELDS[0]
-        if ffrom:
-            df = df[ffrom > effective_date]
+        if effective_date and self.EFFECTIVE_DATE_FIELDS:
+            (ffrom, fto) = self.EFFECTIVE_DATE_FIELDS
 
-        fto = self.PERIOD_DATE_FIELDS[1]
-        ffrom = self.PERIOD_DATE_FIELDS[0]
+            effective_date = self.date_to_field_dtype(df, ffrom, effective_date)
+            effective_date = self.date_to_field_dtype(df, fto, effective_date)
 
-        if fto and not ffrom:
-            return df[fto > commission_period]
-        elif not fto and ffrom:
-            return df[ffrom <= commission_period]
-        else:
-            return df[ffrom <= commission_period < fto]
+            if fto and ffrom is None:
+                df = df[df[fto] >= effective_date]
+            elif fto is None and ffrom:
+                df = df[df[ffrom] <= effective_date]
+            elif fto is not None and ffrom is not None:
+                df = df[df[ffrom] <= effective_date <= df[fto]]
+
+        if period and self.PERIOD_DATE_FIELDS:
+            period = int(period)
+            period_from = datetime(int(period / 100), period % 100, 1)
+            period_to = (period_from + timedelta(days=31)).replace(day=1) + timedelta(days=-1)
+
+            period_from = int(period_from.strftime("%Y%m%d"))
+            period_to = int(period_to.strftime("%Y%m%d"))
+
+            (ffrom, fto) = self.PERIOD_DATE_FIELDS
+
+            if fto:
+                df = df[period_to <= df[fto]]
+
+            if ffrom:
+                df = df[df[ffrom] <= period_from]
+
+        return df
 
 
-    def load_file(self, file):
+    def load_file(self, file, *, period=None, effective_date=None):
         """Use the configured reader and configs to load the file"""
 
         assert self.READER, f"Missing READER configuration"
         assert file is not None, f"Parameter 'file' must not be empty"
 
-        return exec_reader(self.READER, file, self)
+        if not self.is_specification_active(effective_date):
+            raise FileSpecificationException(f"Filespec is inactive for date '{effective_date}")
+
+        df = exec_reader(self.READER, file, self, period=period, effective_date=effective_date)
+        return df

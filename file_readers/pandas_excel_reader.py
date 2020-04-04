@@ -23,10 +23,6 @@ class ExcelReaderException(Exception):
     pass
 
 
-def excel_reader(file, filespec):
-    return None
-
-
 def load_excel(file: str, filespec, effective_date=None):
     df = only_load_excel(file, filespec)
 
@@ -42,33 +38,38 @@ def only_load_excel(file: str, filespec):
     skip_rows = getattr(filespec, "SKIP_ROWS", 0)
 
     fieldspecs = filespec.FIELDSPECS
-    names = [x["name"] for x in fieldspecs]
+    if fieldspecs:
+        names = [x["name"] for x in fieldspecs]
 
-    # If a dtype is included, we don't want Pandas to make a guess itself.
-    # E.g. number with leading 0's (e.g. MSISDN) would be converted into ints.
-    dtype = {x["name"] : x["dtype"] for x in fieldspecs if ("dtype" in x) and not x["dtype"].startswith("int")}
+        # If a dtype is included, we don't want Pandas to make a guess itself.
+        # E.g. number with leading 0's (e.g. MSISDN) would be converted into ints.
+        dtype = {x["name"] : x["dtype"] for x in fieldspecs if ("dtype" in x) and not x["dtype"].startswith("int")}
+    else:
+        names = None
+        dtype = None
 
     df = pd.read_excel(file, usecols=names, sheet_name=sheet, dtype=dtype, skiprows=skip_rows)
 
     # Remove newlines in some of the cells.
     df = df.replace(r'[\s\r\n]+', ' ', regex=True)
 
-    for i in range(len(names)):
-        spec = fieldspecs[i]
-        name = spec.get("name")
-        dtype = spec.get("dtype")
-        default = spec.get("default")
+    if names:
+        for i in range(len(names)):
+            spec = fieldspecs[i]
+            name = spec.get("name")
+            dtype = spec.get("dtype")
+            default = spec.get("default")
 
-        if default is not None:
-            df[name] = df[name].fillna(default)
+            if default is not None:
+                df[name] = df[name].fillna(default)
 
-        if dtype is not None:
-            try:
-                df[name] = df[name].astype(dtype)
-            except ValueError:
-                raise PilExcelReaderException(
-                    f"Column '{name}' contains NA values. "
-                    f"Either fill all values or configure a default. File={file}")
+            if dtype is not None:
+                try:
+                    df[name] = df[name].astype(dtype)
+                except ValueError:
+                    raise ExcelReaderException(
+                        f"Column '{name}' contains NA values. "
+                        f"Either fill all values or configure a default. File={file}")
 
 
     # Fix column names to make access more easy
