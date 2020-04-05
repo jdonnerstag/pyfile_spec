@@ -10,6 +10,7 @@ import re
 import os
 import fnmatch
 import logging
+import pickle
 from datetime import datetime, timedelta
 
 from typing import Optional, List
@@ -101,6 +102,11 @@ class FileSpecification(object):
 
     # The file reader 
     READER = None
+
+    # Some files are too slow to read because of the format, filters, etc.. 
+    # To speed up the process it is possible to read a cached pickle file
+    # instead. However be careful: ONLY USE IN DEVELOPMENT
+    CACHE_FILE = None
 
 
     def __init__(self):
@@ -461,7 +467,19 @@ class FileSpecification(object):
 
 
     def load_file(self, file, *, period=None, effective_date=None):
-        """Use the configured reader and configs to load the file"""
+        """We essentially have 2 use cases: (a) find a matching file spec for a
+        file that arrive in some folder and then apply the spec to load the file, 
+        and (b) users have configured a file spec for a manual file which they want 
+        to load. The 2nd step for both is the same. This method represents that 2nd 
+        step: apply the file provided to exactly this spec.
+        
+        Being a commonly required functionality, loading the file includes filtering
+        the records according to the period and effective dates provided. Note that,
+        different to when we are searching for a matching spec, now that we have a 
+        spec and a file, we do not (again) vaidate that the file actually complies 
+        with the spec. It assume it is the users choices and loading the file with 
+        this spec is exactly what he wants.
+        """
 
         assert self.READER, f"Missing READER configuration"
         assert file is not None, f"Parameter 'file' must not be empty"
@@ -470,4 +488,8 @@ class FileSpecification(object):
             raise FileSpecificationException(f"Filespec is inactive for date '{effective_date}")
 
         df = exec_reader(self.READER, file, self, period=period, effective_date=effective_date)
+
+        # The user may have configured e.g. an effective  
+        df = self.df_filter(df, period, effective_date)
+
         return df

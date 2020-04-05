@@ -26,7 +26,7 @@ class ExcelReaderException(Exception):
 def load_excel(file: str, filespec, effective_date=None):
     df = only_load_excel(file, filespec)
 
-    df = filter_by_effective_date_fieldspec(df, effective_date, filespec)
+    # df = filter_by_effective_date_fieldspec(df, effective_date, filespec)
 
     return df
 

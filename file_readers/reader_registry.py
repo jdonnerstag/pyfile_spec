@@ -57,8 +57,4 @@ def exec_reader(name, file, filespec, *, period, effective_date):
     reader = reader_by_name(name)
 
     # Read the data
-    df = reader(file, filespec)
-
-    # The user may have configured e.g. an effective  
-    df = filespec.df_filter(df, period, effective_date)
-    return df
+    return reader(file, filespec)
