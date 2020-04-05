@@ -36,6 +36,7 @@ def only_load_excel(file: str, filespec):
 
     sheet = getattr(filespec, "SHEET", 0)
     skip_rows = getattr(filespec, "SKIP_ROWS", 0)
+    index_cols = getattr(filespec, "EXCEL_INDEX_COLS")
 
     fieldspecs = filespec.FIELDSPECS
     if fieldspecs:
@@ -48,7 +49,7 @@ def only_load_excel(file: str, filespec):
         names = None
         dtype = None
 
-    df = pd.read_excel(file, usecols=names, sheet_name=sheet, dtype=dtype, skiprows=skip_rows)
+    df = pd.read_excel(file, usecols=names, sheet_name=sheet, dtype=dtype, skiprows=skip_rows, index_col=index_cols)
 
     # Remove newlines in some of the cells.
     df = df.replace(r'[\s\r\n]+', ' ', regex=True)
@@ -128,41 +129,3 @@ def filter_by_effective_date(df, effective_date: int, key: str, col_start_date: 
         df = df.reset_index()
 
     return df
-
-
-def load_excel_with_cache(file, filespec, effective_date=None):
-
-    cache_name = getattr(filespec, "CACHE_NAME")
-    cache_file = getattr(filespec, "CACHE_FILE")
-    if not cache_file:
-        return load_excel(file, filespec, effective_date=effective_date)
-
-    # Get the local cache info if their are any
-    lcache = pil.config.get(cache_file, default=None)
-    if not lcache:
-        logger.debug(f"No config for local {cache_name} cache file: '{lcache}'")
-
-    # If the local cache is newer then the Excel, then load it instead
-    df = None
-    if lcache and os.path.isfile(lcache) and (os.path.getmtime(file) < os.path.getmtime(lcache)):
-        logger.debug(f"Load {cache_name} from local cache: '{lcache}'")
-        try:
-            with open(lcache, "rb") as fd:
-                df = pickle.load(fd)
-        except BaseException:
-            logger.debug(f"Failed to load local {cache_name} cache from: '{lcache}'")
-            df = None
-
-    # Didn't find a cache file, or loading failed, or caching is not configured, ...
-    if df is None:
-        df = load_excel(file, filespec, effective_date=effective_date)
-
-        # Update the cache if caching is configured
-        if lcache:
-            logger.debug(f"Update local {cache_name} cache: '{lcache}'")
-            with open(lcache, "wb") as fd:
-                pickle.dump(df, fd)
-
-
-    return df
-    

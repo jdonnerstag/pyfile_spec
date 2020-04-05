@@ -91,6 +91,12 @@ class FileSpecification(object):
     # Some readers support skipping the first N rows, e.g. Excel, csv, fwf
     SKIP_ROWS = None
 
+    # Excel Sheet index or name
+    SHEET = 0
+
+    # Pandas read_excel index_col argument
+    EXCEL_INDEX_COLS = None
+
     # Exclude records based on the effective date. By default that is today(), 
     # but can be any date if data reflecting a specific point in time are needed.
     # Must be a tuple or list with 3 elements: [<from>, <to>] in the form of
