@@ -93,10 +93,7 @@ def test_read_fwf_data():
     assert list(df.columns) == list(spec.fieldSpecNames)
 
 
-def test_fwf_with_effective_date_filter_in_df():
-
-    spec = HumanFile()
-    spec.READER = "fwf"
+def exec_fwf_with_effective_date_filter(spec):
     spec.EFFECTIVE_DATE_FIELDS = ["birthday", None]
     spec["birthday"]["dtype"] = "int32"
 
@@ -108,10 +105,23 @@ def test_fwf_with_effective_date_filter_in_df():
     assert len(df.index) == 7
     assert list(df.columns) == list(spec.fieldSpecNames)
 
+    df = spec.load_file(DATA, effective_date="20000101")
+    assert len(df.index) == 7
+    assert list(df.columns) == list(spec.fieldSpecNames)
 
-def test_fwf_with_period_filter_in_df():
+    df = spec.load_file(DATA, effective_date=b"20000101")
+    assert len(df.index) == 7
+    assert list(df.columns) == list(spec.fieldSpecNames)
 
-    spec = FwFTestData()
+
+def test_fwf_with_effective_date_filter_in_df():
+
+    spec = HumanFile()
+    spec.READER = "fwf"
+    exec_fwf_with_effective_date_filter(spec)
+
+
+def exec_fwf_with_period_filter(spec):
 
     df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD)
     assert len(df.index) == 10
@@ -152,6 +162,27 @@ def test_fwf_with_period_filter_in_df():
     df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201806", effective_date=20180630)
     assert len(df.index) == 2
     assert list(df.columns) == list(spec.fieldSpecNames)
+
+
+def test_fwf_with_period_filter_in_df():
+
+    spec = FwFTestData()
+    spec.READER = "fwf"
+    exec_fwf_with_period_filter(spec)
+
+
+def test_fwf_with_effective_date_filter_inline():
+
+    spec = HumanFile()
+    spec.READER = "fwf-large-file"
+    exec_fwf_with_effective_date_filter(spec)
+
+
+def test_fwf_with_period_filter_inline():
+
+    spec = FwFTestData()
+    spec.READER = "fwf-large-file"
+    exec_fwf_with_period_filter(spec)
 
 
 # Note: On Windows all of your multiprocessing-using code must be guarded by if __name__ == "__main__":

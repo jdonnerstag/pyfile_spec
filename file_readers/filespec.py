@@ -381,7 +381,7 @@ class FileSpecification(object):
         return True
 
 
-    def record_filter_by_period(self, rec, fields, period_str):
+    def record_filter_by_period(self, rec, fields, period_from_str, period_until_str):
         """This is just a default implementation which does not cover all use cases.
         Subclasses may replace it with their own logic.
 
@@ -389,10 +389,22 @@ class FileSpecification(object):
         matches when the first bytes/chars in the date string found in the 
         record, match the period_str provided.
         """
-        return self.record_filter_by_date(rec, fields, period_str)
+
+        if not (fields and period_from_str and period_until_str):
+            return True
+
+        (ffrom, fto) = fields
+
+        if fto and (rec[fto][0 : len(period_until_str)] < period_until_str):
+            return False
+
+        if ffrom and (rec[ffrom][0 : len(period_from_str)] > period_from_str):
+            return False
+
+        return True
 
 
-    def record_filter(self, rec, period, effective_date):
+    def record_filter(self, rec, *, period_from, period_until, effective_date):
         """Skip records which are not relevant
         
         NOTE: This method is sensitive to the performance of reading a file, 
@@ -406,7 +418,7 @@ class FileSpecification(object):
         if not rtn:
             return False
 
-        return self.record_filter_by_period(rec, self.PERIOD_DATE_FIELDS, period)
+        return self.record_filter_by_period(rec, self.PERIOD_DATE_FIELDS, period_from, period_until)
 
 
     def date_to_field_dtype(self, df, field, date):
@@ -414,16 +426,22 @@ class FileSpecification(object):
         so that it can be compared the dataframe field.
         """
 
-        if (field 
-            and df[field].dtype.name.startswith("int") 
-            and isinstance(date, datetime)):
+        if field and df[field].dtype.name.startswith("int"):
+            if isinstance(date, bytes):
+                date = str(date, "utf-8")
 
-            date = int(date.strftime("%Y%m%d"))
-        elif (field 
-            and df[field].dtype.name.startswith("datetime64") 
-            and isinstance(date, int)):
+            if isinstance(date, datetime):
+                date = int(date.strftime("%Y%m%d"))
+            elif isinstance(date, str):
+                date = int(date)
+        elif field and df[field].dtype.name.startswith("datetime64"):
+            if isinstance(date, bytes):
+                date = str(date, "utf-8")
 
-            date = datetime(int(date / 10000), int(date / 100) % 100, date % 100)
+            if isinstance(date, int):
+                date = datetime(int(date / 10000), int(date / 100) % 100, date % 100)
+            elif isinstance(date, str):
+                date = datetime(int(date[0:4]), int(date[4:6]), int(date[6:8]))
 
         return date
 
@@ -493,9 +511,10 @@ class FileSpecification(object):
         if not self.is_specification_active(effective_date):
             raise FileSpecificationException(f"Filespec is inactive for date '{effective_date}")
 
-        df = exec_reader(self.READER, file, self, period=period, effective_date=effective_date)
+        (df, filtered) = exec_reader(self.READER, file, self, period=period, effective_date=effective_date)
 
         # The user may have configured e.g. an effective  
-        df = self.df_filter(df, period, effective_date)
+        if not filtered:
+            df = self.df_filter(df, period, effective_date)
 
         return df
