@@ -18,18 +18,18 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='file_reader',
+    name='file specs',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
     version='0.1.0',
 
-    description='... File Reader ...',
+    description='... file specs ...',
     long_description=long_description,
 
     # The project's main homepage.
-    url='https://github.com/xxx/py_file_reader',
+    url='https://github.com/xxx/pyfilespec',
     download_url='https://github.com/xxx/pyfwf_db/archive/0.1.0.tar.gz',
 
     # Author details
@@ -68,7 +68,7 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='Database like read-access to fixed-width files',
+    keywords='xxxxx',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().

@@ -421,6 +421,10 @@ class FileSpecification(object):
         return self.record_filter_by_period(rec, self.PERIOD_DATE_FIELDS, period_from, period_until)
 
 
+    def fwf_filter(self, fwf, *, period, effective_date):
+        return fwf
+
+
     def date_to_field_dtype(self, df, field, date):
         """Given a dataframe and the dtype of a field, cast the 'date' argument
         so that it can be compared the dataframe field.

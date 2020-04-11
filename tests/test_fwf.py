@@ -9,6 +9,7 @@ import io
 from datetime import datetime
 
 from file_readers.filespec import FileSpecification
+from file_readers.fwf_file_reader import FWFFileReader
 
 
 DATA = b"""# My comment test
@@ -28,7 +29,7 @@ US       ME20080503F0f51da89a299Kelly Crose             Whatever    Comedian    
 class HumanFile(FileSpecification):
 
     FIELDSPECS = [
-        {"name": "location", "len": 9},     # TODO That must be 10 ?!?!
+        {"name": "location", "len": 9}, 
         {"name": "state", "len": 2},
         {"name": "birthday", "len": 8},
         {"name": "gender", "len": 1},
@@ -72,117 +73,83 @@ def test_constructor():
     spec = HumanFile()
     assert spec
 
+    reader = FWFFileReader(spec)
+    assert reader
+    
 
 def test_read_fwf_data():
 
     spec = HumanFile()
-    with pytest.raises(Exception):
-        df = spec.load_file(DATA)
-
-    with pytest.raises(Exception):
-        spec.READER = None
-        df = spec.load_file(DATA)
-
-    with pytest.raises(Exception):
-        spec.READER = "xxx"
-        df = spec.load_file(DATA)
-
-    spec.READER = "fwf"
-    df = spec.load_file(DATA)
+    df = FWFFileReader(spec).load(DATA)
     assert len(df.index) == 10
     assert list(df.columns) == list(spec.fieldSpecNames)
 
 
-def exec_fwf_with_effective_date_filter(spec):
-    spec.EFFECTIVE_DATE_FIELDS = ["birthday", None]
-    spec["birthday"]["dtype"] = "int32"
-
-    df = spec.load_file(DATA, effective_date=datetime(2000, 1, 1))
-    assert len(df.index) == 7
-    assert list(df.columns) == list(spec.fieldSpecNames)
-
-    df = spec.load_file(DATA, effective_date=20000101)
-    assert len(df.index) == 7
-    assert list(df.columns) == list(spec.fieldSpecNames)
-
-    df = spec.load_file(DATA, effective_date="20000101")
-    assert len(df.index) == 7
-    assert list(df.columns) == list(spec.fieldSpecNames)
-
-    df = spec.load_file(DATA, effective_date=b"20000101")
-    assert len(df.index) == 7
-    assert list(df.columns) == list(spec.fieldSpecNames)
-
-
-def test_fwf_with_effective_date_filter_in_df():
+def test_fwf_with_effective_date_filter():
 
     spec = HumanFile()
-    spec.READER = "fwf"
-    exec_fwf_with_effective_date_filter(spec)
+    spec.EFFECTIVE_DATE_FIELDS = "birthday"
+    spec["birthday"]["dtype"] = "int32"
+
+    df = FWFFileReader(spec).load(DATA, effective_date=datetime(2000, 1, 1))
+    assert len(df.index) == 7
+    assert list(df.columns) == list(spec.fieldSpecNames)
+
+    df = FWFFileReader(spec).load(DATA, effective_date=20000101)
+    assert len(df.index) == 7
+    assert list(df.columns) == list(spec.fieldSpecNames)
+
+    df = FWFFileReader(spec).load(DATA, effective_date="20000101")
+    assert len(df.index) == 7
+    assert list(df.columns) == list(spec.fieldSpecNames)
+
+    df = FWFFileReader(spec).load(DATA, effective_date=b"20000101")
+    assert len(df.index) == 7
+    assert list(df.columns) == list(spec.fieldSpecNames)
 
 
-def exec_fwf_with_period_filter(spec):
+def test_fwf_with_period_filter():
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD)
+    spec = FwFTestData()
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD)
     assert len(df.index) == 10
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, effective_date=20180630)
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, effective_date=20180630)
     assert len(df.index) == 4
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201801")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180101, period_until=20180131)
     assert len(df.index) == 2   # 
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201802")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180201, period_until=20180229)
     assert len(df.index) == 2
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201803")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180301, period_until=20180331)
     assert len(df.index) == 2
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201804")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180401, period_until=20180430)
     assert len(df.index) == 1
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201805")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180501, period_until=20180531)
     assert len(df.index) == 3
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201806")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180601, period_until=20180630)
     assert len(df.index) == 3
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201812")
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20181201, period_until=20181231)
     assert len(df.index) == 4
     assert list(df.columns) == list(spec.fieldSpecNames)
 
-    df = spec.load_file(DATA_FWF_EFFECTIVE_PERIOD, period="201806", effective_date=20180630)
+    df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180601, period_until=20180630, effective_date=20180630)
     assert len(df.index) == 2
     assert list(df.columns) == list(spec.fieldSpecNames)
-
-
-def test_fwf_with_period_filter_in_df():
-
-    spec = FwFTestData()
-    spec.READER = "fwf"
-    exec_fwf_with_period_filter(spec)
-
-
-def test_fwf_with_effective_date_filter_inline():
-
-    spec = HumanFile()
-    spec.READER = "fwf-large-file"
-    exec_fwf_with_effective_date_filter(spec)
-
-
-def test_fwf_with_period_filter_inline():
-
-    spec = FwFTestData()
-    spec.READER = "fwf-large-file"
-    exec_fwf_with_period_filter(spec)
 
 
 # Note: On Windows all of your multiprocessing-using code must be guarded by if __name__ == "__main__":

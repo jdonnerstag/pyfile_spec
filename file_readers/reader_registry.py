@@ -21,6 +21,10 @@ class ReaderRegistryException(Exception):
     pass
 
 
+def excel_wrapper(file, filespec, **kvargs):
+    return (load_excel(file, filespec), False)
+
+
 def fwf_wrapper(file, filespec, **kvargs):
     fwf = FWFFile(filespec)
     with fwf.open(file) as fd:
@@ -69,8 +73,11 @@ def fwf_large_wrapper(file, filespec, *, period, effective_date):
         return (FWFPandas(fd).to_pandas(), True)
 
 
-def excel_wrapper(file, filespec, **kvargs):
-    return (load_excel(file, filespec), False)
+def fwf_cython_fwf_wrapper(file, filespec, *, period, effective_date):
+    fwf = FWFFile(filespec)
+    with fwf.open(file) as fd:
+        fd = filespec.fwf_filter(fd, period=period, effective_date=effective_date)
+        return (FWFPandas(fd).to_pandas(), True)
 
 
 _map = {
@@ -78,6 +85,7 @@ _map = {
     "csv": None,    # csv_reader,
     "fwf": fwf_wrapper,
     "fwf-large-file": fwf_large_wrapper,
+    "fwf-cython": fwf_cython_fwf_wrapper,
 }
 
 
