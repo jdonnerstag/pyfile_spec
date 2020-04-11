@@ -41,7 +41,9 @@ class FWFFileReader(object):
         self.period_date_fields = getattr(filespec, "PERIOD_DATE_FIELDS", None)    
 
 
-    def load(self, file, *, period_from=None, period_until=None, effective_date=None):
+    def load(self, file, *, period_from=None, period_until=None, effective_date=None,
+        index=None, unique_index=True, integer_index=False):
+
         kvargs = {k:v for k, v in locals().items() if k not in ["self", "file"]}
 
         if effective_date is None:
@@ -55,7 +57,8 @@ class FWFFileReader(object):
         return df
 
 
-    def load_file(self, file, *, period_from=None, period_until=None, effective_date=None, **kvargs):
+    def load_file(self, file, *, period_from=None, period_until=None, effective_date=None, 
+        index=None, unique_index=True, integer_index=False, **kvargs):
         """Applying the filespec import the data from a fixed width file"""
 
         effective_date = self.to_bytes(effective_date)
