@@ -152,6 +152,62 @@ def test_fwf_with_period_filter():
     assert list(df.columns) == list(spec.fieldSpecNames)
 
 
+def test_fwf_index():
+
+    spec = FwFTestData()
+
+    # Keep the file content accessible even after loading it
+    with FWFFileReader(spec) as fd:
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID")
+        assert len(idx) == 10
+        for i, ii in enumerate(idx):
+            assert i + 1 == int(ii)
+            x = idx[ii]
+            assert x
+            assert len(x) == 1
+            assert x[0].lineno == i
+            assert x.lines == [i] 
+
+
+def test_fwf_unique_index():
+
+    spec = FwFTestData()
+    with FWFFileReader(spec) as fd:
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=True, func=lambda x: x.decode())
+        assert len(idx) == 10
+        for i, ii in enumerate(idx):
+            assert i + 1 == int(ii)
+            x = idx[ii]
+            assert x
+            assert x.lineno == i 
+            assert x.line.decode().startswith(ii)
+
+
+def test_fwf_integer_index():
+
+    spec = FwFTestData()
+    with FWFFileReader(spec) as fd:
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=False, integer_index=True)
+        assert len(idx) == 10
+        for i, ii in enumerate(idx):
+            assert i + 1 == ii
+            x = idx[ii]
+            assert x
+            assert len(x) == 1
+            assert x[0].lineno == i
+            assert x.lines == [i] 
+
+    with FWFFileReader(spec) as fd:
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=True, integer_index=True)
+        assert len(idx) == 10
+        for i, ii in enumerate(idx):
+            assert i + 1 == ii
+            x = idx[ii]
+            assert x
+            assert x.lineno == i 
+            assert x.line.decode().startswith(str(ii) + " ")
+
+
 # Note: On Windows all of your multiprocessing-using code must be guarded by if __name__ == "__main__":
 if __name__ == '__main__':
 

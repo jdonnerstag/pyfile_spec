@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from fwf_db.fwf_file import FWFFile
-from fwf_db.fwf_cython_filter import FWFCythonFilter
+from fwf_db.fwf_cython import FWFCython
 from fwf_db.fwf_pandas import FWFPandas
 
 logger = logging.getLogger(__name__)
@@ -40,47 +40,80 @@ class FWFFileReader(object):
         self.effective_date_fields = getattr(filespec, "EFFECTIVE_DATE_FIELDS", None)
         self.period_date_fields = getattr(filespec, "PERIOD_DATE_FIELDS", None)    
 
+        self.fd = None
+
+
+    def __enter__(self):
+        """Keep the fwf file content accessible even after 'loading' it.
+        Bear in mind fwf_db memory maps the file and the file must be kept
+        open to access it.
+
+        E.g.
+        with FWFFileReader(spec) as fd:
+            idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID")
+
+        """
+        return self
+
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.fd is not None:
+            self.fd.close()
+
 
     def load(self, file, *, period_from=None, period_until=None, effective_date=None,
-        index=None, unique_index=True, integer_index=False):
+        index=None, unique_index=False, integer_index=False, func=None):
 
         kvargs = {k:v for k, v in locals().items() if k not in ["self", "file"]}
 
         if effective_date is None:
             kvargs["effective_date"] = effective_date = datetime.now()
 
+        file_name = file.file if isinstance(file, FWFFile) else file
+
         # Fixed width files can be massive and try to filter as much as possible
         # while loading them.
         df = self.load_file(file, **kvargs)
-        df = self.cleanup(df, file, **kvargs)
+        df = self.cleanup(df, file_name, **kvargs)
         df = self.filter(df, **kvargs)
         return df
 
 
     def load_file(self, file, *, period_from=None, period_until=None, effective_date=None, 
-        index=None, unique_index=True, integer_index=False, **kvargs):
+        index=None, unique_index=False, integer_index=False, **kvargs):
         """Applying the filespec import the data from a fixed width file"""
+
+        args = {k : v for k, v in locals().items() if k not in ["self", "file"]}
+        if not isinstance(file, FWFFile):
+            self.fd = FWFFile(self.filespec).open(file)
+            return self.load_file(self.fd, **args)
+
 
         effective_date = self.to_bytes(effective_date)
         period_from = self.to_bytes(period_from)
         period_until = self.to_bytes(period_until)
 
-        fwf = FWFFile(self.filespec)
-        with fwf.open(file) as fd:
-            # Determine effective date and apply
-            # Determine period and apply
-            fd_filtered = FWFCythonFilter(fd).filter(
-                self.effective_date_fields, effective_date,
-                self.period_date_fields, [period_from, period_until],
-            )
+        # Determine effective date and apply
+        # Determine period and apply
+        fd_filtered = FWFCython(file).apply(
+            self.effective_date_fields, effective_date,
+            self.period_date_fields, [period_from, period_until],
+            index=index, 
+            unique_index=unique_index, 
+            integer_index=integer_index
+        )
 
-            # determine primary key
+        if index is not None:
+            return fd_filtered
 
-            df = FWFPandas(fd_filtered).to_pandas()
-            return df
+        df = FWFPandas(fd_filtered).to_pandas()
+        return df
 
 
-    def cleanup(self, df, file, **kvargs):
+    def cleanup(self, df, file, index=None, func=None, **kvargs):
+        if (index is not None) and callable(func):
+            df.data = {func(k) : v for k, v in df.data.items()}
+
         return df
 
 
