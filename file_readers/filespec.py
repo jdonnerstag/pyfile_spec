@@ -12,10 +12,8 @@ import fnmatch
 import logging
 import pickle
 from datetime import datetime, timedelta
-
 from typing import Optional, List
-
-from .reader_registry import exec_reader
+from .generic_reader import GenericFileReader
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -366,135 +364,7 @@ class FileSpecification(object):
         return True
 
 
-    def record_filter_by_date(self, rec, fields, date):
-        if not fields or not date:
-            return True
-
-        (ffrom, fto) = fields
-
-        if fto and (rec[fto][0 : len(date)] < date):
-            return False
-
-        if ffrom and (rec[ffrom][0 : len(date)] > date):
-            return False
-
-        return True
-
-
-    def record_filter_by_period(self, rec, fields, period_from_str, period_until_str):
-        """This is just a default implementation which does not cover all use cases.
-        Subclasses may replace it with their own logic.
-
-        Assuming a period is like "YYYYMM" denoting a specific month, then it
-        matches when the first bytes/chars in the date string found in the 
-        record, match the period_str provided.
-        """
-
-        if not (fields and period_from_str and period_until_str):
-            return True
-
-        (ffrom, fto) = fields
-
-        if fto and (rec[fto][0 : len(period_until_str)] < period_until_str):
-            return False
-
-        if ffrom and (rec[ffrom][0 : len(period_from_str)] > period_from_str):
-            return False
-
-        return True
-
-
-    def record_filter(self, rec, *, period_from, period_until, effective_date):
-        """Skip records which are not relevant
-        
-        NOTE: This method is sensitive to the performance of reading a file, 
-        especially large files with millions of records. This method will be
-        invoked for each record in that file upon reading. But sometime the 
-        data don't fit into memory and must be filtered while being loaded.
-
-        The default implementation is rather generic and hence not the fastest
-        """
-        rtn = self.record_filter_by_date(rec, self.EFFECTIVE_DATE_FIELDS, effective_date)
-        if not rtn:
-            return False
-
-        return self.record_filter_by_period(rec, self.PERIOD_DATE_FIELDS, period_from, period_until)
-
-
-    def fwf_filter(self, fwf, *, period, effective_date):
-        return fwf
-
-
-    def date_to_field_dtype(self, df, field, date):
-        """Given a dataframe and the dtype of a field, cast the 'date' argument
-        so that it can be compared the dataframe field.
-        """
-
-        if field and df[field].dtype.name.startswith("int"):
-            if isinstance(date, bytes):
-                date = str(date, "utf-8")
-
-            if isinstance(date, datetime):
-                date = int(date.strftime("%Y%m%d"))
-            elif isinstance(date, str):
-                date = int(date)
-        elif field and df[field].dtype.name.startswith("datetime64"):
-            if isinstance(date, bytes):
-                date = str(date, "utf-8")
-
-            if isinstance(date, int):
-                date = datetime(int(date / 10000), int(date / 100) % 100, date % 100)
-            elif isinstance(date, str):
-                date = datetime(int(date[0:4]), int(date[4:6]), int(date[6:8]))
-
-        return date
-
-
-    def df_filter(self, df, period, effective_date):
-        """Skip records which are not relevant.
-
-        File data are loaded into Pandas dataframes. Provided the data 
-        fit into memory, you can filter them here and remove any
-        unwanted records. That is what this method is about.
-
-        Hence it is similar to record_filter() but works on the data
-        AFTER they have been loaded. The outcome of both should be the same
-        despite their different implementation.
-        """ 
-
-        if effective_date and self.EFFECTIVE_DATE_FIELDS:
-            (ffrom, fto) = self.EFFECTIVE_DATE_FIELDS
-
-            effective_date = self.date_to_field_dtype(df, ffrom, effective_date)
-            effective_date = self.date_to_field_dtype(df, fto, effective_date)
-
-            if fto and ffrom is None:
-                df = df[df[fto] >= effective_date]
-            elif fto is None and ffrom:
-                df = df[df[ffrom] <= effective_date]
-            elif fto is not None and ffrom is not None:
-                df = df[df[ffrom] <= effective_date <= df[fto]]
-
-        if period and self.PERIOD_DATE_FIELDS:
-            period = int(period)
-            period_from = datetime(int(period / 100), period % 100, 1)
-            period_to = (period_from + timedelta(days=31)).replace(day=1) + timedelta(days=-1)
-
-            period_from = int(period_from.strftime("%Y%m%d"))
-            period_to = int(period_to.strftime("%Y%m%d"))
-
-            (ffrom, fto) = self.PERIOD_DATE_FIELDS
-
-            if fto:
-                df = df[period_to <= df[fto]]
-
-            if ffrom:
-                df = df[df[ffrom] <= period_from]
-
-        return df
-
-
-    def load_file(self, file, *, period=None, effective_date=None):
+    def load_file(self, file, *, period_from=None, period_until=None, effective_date=None):
         """We essentially have 2 use cases: (a) find a matching file spec for a
         file that arrive in some folder and then apply the spec to load the file, 
         and (b) users have configured a file spec for a manual file which they want 
@@ -515,10 +385,8 @@ class FileSpecification(object):
         if not self.is_specification_active(effective_date):
             raise FileSpecificationException(f"Filespec is inactive for date '{effective_date}")
 
-        (df, filtered) = exec_reader(self.READER, file, self, period=period, effective_date=effective_date)
-
-        # The user may have configured e.g. an effective  
-        if not filtered:
-            df = self.df_filter(df, period, effective_date)
-
-        return df
+        return GenericFileReader(self).load(file, 
+            period_from=period_from, 
+            period_until=period_until, 
+            effective_date=effective_date
+        )
