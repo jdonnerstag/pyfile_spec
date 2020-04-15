@@ -35,7 +35,7 @@ class GenericFileReader(object):
     }
 
     def __init__(self, filespec):
-        assert filespec
+        assert filespec is not None
         self.filespec = filespec
 
         self.name = self.filespec.READER
