@@ -13,6 +13,9 @@ from typing import Optional, List
 from fwf_db.fwf_file import FWFFile
 from fwf_db.fwf_cython import FWFCython
 from fwf_db.fwf_pandas import FWFPandas
+from fwf_db.fwf_multi_file import FWFMultiFile
+from fwf_db.fwf_merge_index import FWFMergeIndex
+from fwf_db.fwf_merge_unique_index import FWFMergeUniqueIndex
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -40,7 +43,8 @@ class FWFFileReader(object):
         self.effective_date_fields = getattr(filespec, "EFFECTIVE_DATE_FIELDS", None)
         self.period_date_fields = getattr(filespec, "PERIOD_DATE_FIELDS", None)    
 
-        self.fd = None
+        self.fd = None  # File descriptor
+        self.mf = None  # Multi file or index
 
 
     def __enter__(self):
@@ -64,6 +68,11 @@ class FWFFileReader(object):
         if self.fd is not None:
             self.fd.close()
 
+        if self.mf is not None:
+            self.mf.close()
+
+        self.fd = self.mf = None
+
 
     def load(self, file, *, period_from=None, period_until=None, effective_date=None,
         index=None, unique_index=False, integer_index=False, func=None):
@@ -85,12 +94,40 @@ class FWFFileReader(object):
 
     def load_file(self, file, *, period_from=None, period_until=None, effective_date=None, 
         index=None, unique_index=False, integer_index=False, **kvargs):
+
+        args = {k : v for k, v in locals().items() if k not in ["self", "file"]}
+
+        if isinstance(file, (str, bytes)):
+            return self.load_single_file(file, **args)
+
+        if not isinstance(file, list):
+            raise FWFFileReaderException(f"Expected 'file' to be of list type")
+        
+        if index is None:
+            self.mf = FWFMultiFile(self.filespec)
+        elif unique_index is True:
+            self.mf = FWFMergeUniqueIndex(self.filespec, index=index, integer_index=integer_index)
+        else:
+            self.mf = FWFMergeIndex(self.filespec, index=index, integer_index=integer_index)
+
+        for f in file:
+            self.mf.open(f)
+
+        if index:
+            return self.mf
+            
+        dtype = {x["name"] : x.get("dtype", "object") for x in self.fieldspecs}
+        return FWFPandas(self.mf).to_pandas(dtype)
+
+
+    def load_single_file(self, file, *, period_from=None, period_until=None, effective_date=None, 
+        index=None, unique_index=False, integer_index=False, **kvargs):
         """Applying the filespec import the data from a fixed width file"""
 
         args = {k : v for k, v in locals().items() if k not in ["self", "file"]}
         if not isinstance(file, FWFFile):
             self.fd = FWFFile(self.filespec).open(file)
-            return self.load_file(self.fd, **args)
+            return self.load_single_file(self.fd, **args)
 
 
         effective_date = self.to_bytes(effective_date)
@@ -110,8 +147,7 @@ class FWFFileReader(object):
         if index is not None:
             return fd_filtered
 
-        df = FWFPandas(fd_filtered).to_pandas()
-        return df
+        return FWFPandas(fd_filtered).to_pandas()
 
 
     def cleanup(self, df, file, index=None, func=None, **kvargs):
