@@ -232,7 +232,7 @@ class FileSpecification(object):
         return afrom <= effective_date <= bto
 
 
-    def match_filename(self, file, *, period=None, effective_date=None):
+    def match_filename(self, file, *, effective_date=None):
         """Return true, if this file spec is suitable and applicable
         for loading the file.
 

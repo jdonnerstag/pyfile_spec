@@ -7,7 +7,6 @@
 import logging
 from datetime import datetime
 
-from .pandas_excel_reader import load_excel
 from fwf_db import FWFFile
 from fwf_db.fwf_pandas import FWFPandas
 from fwf_db.fwf_operator import FWFOperator as op
