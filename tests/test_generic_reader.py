@@ -187,9 +187,8 @@ def test_fwf_index():
     with GenericFileReader(spec) as fd:
         idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID")
         assert len(idx) == 10
-        for i, ii in enumerate(idx):
+        for i, (ii, x) in enumerate(idx):
             assert i + 1 == int(ii)
-            x = idx[ii]
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
@@ -202,9 +201,8 @@ def test_fwf_unique_index():
     with GenericFileReader(spec) as fd:
         idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=True, func=lambda x: x.decode())
         assert len(idx) == 10
-        for i, ii in enumerate(idx):
+        for i, (ii, x) in enumerate(idx):
             assert i + 1 == int(ii)
-            x = idx[ii]
             assert x
             assert x.lineno == i 
             assert x.line.decode().startswith(ii)
@@ -216,9 +214,8 @@ def test_fwf_integer_index():
     with GenericFileReader(spec) as fd:
         idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=False, integer_index=True)
         assert len(idx) == 10
-        for i, ii in enumerate(idx):
+        for i, (ii, x) in enumerate(idx):
             assert i + 1 == ii
-            x = idx[ii]
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
@@ -227,9 +224,8 @@ def test_fwf_integer_index():
     with GenericFileReader(spec) as fd:
         idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=True, integer_index=True)
         assert len(idx) == 10
-        for i, ii in enumerate(idx):
+        for i, (ii, x) in enumerate(idx):
             assert i + 1 == ii
-            x = idx[ii]
             assert x
             assert x.lineno == i 
             assert x.line.decode().startswith(str(ii) + " ")
