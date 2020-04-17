@@ -66,6 +66,7 @@ class FwFTestData(FileSpecification):
     READER = "fwf"
     PERIOD_DATE_FIELDS = ["valid_from", "valid_until"]
     EFFECTIVE_DATE_FIELDS = ["changed", None]
+    INDEX = None
 
 
 def test_constructor():
@@ -157,8 +158,20 @@ def test_fwf_index():
     spec = FwFTestData()
 
     # Keep the file content accessible even after loading it
+    spec.INDEX = "ID"
     with FWFFileReader(spec) as fd:
-        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID")
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD)
+        assert len(idx) == 10
+        for i, (ii, x) in enumerate(idx):
+            assert i + 1 == int(ii)
+            assert x
+            assert len(x) == 1
+            assert x[0].lineno == i
+            assert x.lines == [i] 
+
+    spec.INDEX = dict(index="ID", unique_index=False, integer_index=False)
+    with FWFFileReader(spec) as fd:
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD)
         assert len(idx) == 10
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == int(ii)
@@ -171,8 +184,9 @@ def test_fwf_index():
 def test_fwf_unique_index():
 
     spec = FwFTestData()
+    spec.INDEX = dict(index="ID", unique_index=True, integer_index=False)
     with FWFFileReader(spec) as fd:
-        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=True, func=lambda x: x.decode())
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, func=lambda x: x.decode())
         assert len(idx) == 10
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == int(ii)
@@ -184,8 +198,9 @@ def test_fwf_unique_index():
 def test_fwf_integer_index():
 
     spec = FwFTestData()
+    spec.INDEX = dict(index="ID", unique_index=False, integer_index=True)
     with FWFFileReader(spec) as fd:
-        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=False, integer_index=True)
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD)
         assert len(idx) == 10
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == ii
@@ -194,8 +209,9 @@ def test_fwf_integer_index():
             assert x[0].lineno == i
             assert x.lines == [i] 
 
+    spec.INDEX = dict(index="ID", unique_index=True, integer_index=True)
     with FWFFileReader(spec) as fd:
-        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD, index="ID", unique_index=True, integer_index=True)
+        idx = fd.load(DATA_FWF_EFFECTIVE_PERIOD)
         assert len(idx) == 10
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == ii

@@ -93,7 +93,7 @@ class FileSpecification(object):
     SHEET = 0
 
     # Pandas read_excel index_col argument
-    EXCEL_INDEX_COLS = None
+    INDEX = None
 
     # Exclude records based on the effective date. By default that is today(), 
     # but can be any date if data reflecting a specific point in time are needed.
@@ -280,7 +280,7 @@ class FileSpecification(object):
 
         try:
             pat = re.compile(pattern)
-            return pat.match(file) is not None
+            return pat.search(file) is not None
         except:
             return False
 

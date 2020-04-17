@@ -32,10 +32,10 @@ class ExceFileReader(object):
         self.sheet = getattr(filespec, "SHEET", 0)
         self.skip_rows = getattr(filespec, "SKIP_ROWS", 0)
 
-        self.index_col = getattr(filespec, "PRIMARY_KEY", None)
+        self.index_col = getattr(filespec, "INDEX", None)
 
         self.effective_date_fields = getattr(filespec, "EFFECTIVE_DATE_FIELDS", None)
-        self.period_date_fields = getattr(filespec, "PERIOD_DATE_FIELDS", None)    
+        self.period_date_fields = getattr(filespec, "PERIOD_DATE_FIELDS", None)
 
         self.names = None
         self.dtype = None

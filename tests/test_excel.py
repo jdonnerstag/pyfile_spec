@@ -118,7 +118,7 @@ def test_excel_with_period():
     assert list(df.columns) == list(spec.fieldSpecNames)
 
 
-def test_primary_key():
+def test_INDEX():
     pass
     # TODO Implement ...
 

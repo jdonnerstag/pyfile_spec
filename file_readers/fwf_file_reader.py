@@ -37,7 +37,7 @@ class FWFFileReader(object):
         self.fieldspecs = self.filespec.FIELDSPECS
         assert len(self.fieldspecs) > 0
 
-        self.index_col = getattr(filespec, "PRIMARY_KEY", None)
+        self.index = getattr(filespec, "INDEX", None)
 
         # TODO currently we validate the fields much later. To detect errors earlier ...
         self.effective_date_fields = getattr(filespec, "EFFECTIVE_DATE_FIELDS", None)
@@ -75,12 +75,23 @@ class FWFFileReader(object):
 
 
     def load(self, file, *, period_from=None, period_until=None, effective_date=None,
-        index=None, unique_index=False, integer_index=False, func=None):
+        func=None):
+
+        if effective_date is None:
+            effective_date = datetime.now()
 
         kvargs = {k:v for k, v in locals().items() if k not in ["self", "file"]}
 
-        if effective_date is None:
-            kvargs["effective_date"] = effective_date = datetime.now()
+        if isinstance(self.index, dict):
+            valid_keys = ["index", "unique_index", "integer_index"]
+            for k in self.index.keys():
+                if k not in valid_keys:
+                    raise FWFFileReaderException(
+                        f'Invalid INDEX. Only {valid_keys} are allowed')
+
+            kvargs.update(self.index)
+        else:
+            kvargs["index"] = self.index
 
         file_name = file.file if isinstance(file, FWFFile) else file
 
@@ -160,7 +171,7 @@ class FWFFileReader(object):
     def filter(self, df, *, period_from=None, period_until=None, effective_date=None, **kvargs):
         df = self.filter_effective_date(df, effective_date)
         df = self.filter_period(df, period_from, period_until)
-        df = self.filter_tail(df, self.index_col)
+        df = self.filter_tail(df, self.index)
         return df
 
 

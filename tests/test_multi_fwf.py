@@ -27,6 +27,7 @@ class FwFTestData(FileSpecification):
     READER = "fwf"
     PERIOD_DATE_FIELDS = ["valid_from", "valid_until"]
     EFFECTIVE_DATE_FIELDS = ["changed", None]
+    INDEX = "ID"
 
 
 def test_constructor():
@@ -44,7 +45,7 @@ def test_single_file():
     flen = [10, 3, 3, 1, 2, 3, 2, 0, 1, 1]
 
     for i, file in enumerate(glob.glob("./tests/data/file*.txt")):
-        rtn = FWFFileReader(spec).load(file, index="ID")
+        rtn = FWFFileReader(spec).load(file)
         assert len(rtn) == flen[i], f"i = {i}"
 
 
@@ -55,7 +56,7 @@ def test_multi_file():
     files = glob.glob("./tests/data/file*.txt")
     #files = files[0:2]
 
-    rtn = FWFFileReader(spec).load(files, index="ID")
+    rtn = FWFFileReader(spec).load(files)
     assert len(rtn) == 13
 
     flen = [4, 3, 3, 2, 2, 2, 1, 2, 2, 2, 1, 1, 1]
@@ -66,7 +67,8 @@ def test_multi_file():
     for i, (_, v) in enumerate(rtn):
         assert len(v) == flen[i], f"i = {i}"
 
-    rtn = FWFFileReader(spec).load(files, index="ID", unique_index=True)
+    spec.INDEX = dict(index="ID", unique_index=True)
+    rtn = FWFFileReader(spec).load(files)
     assert len(rtn) == 13
 
     for _, line in rtn:

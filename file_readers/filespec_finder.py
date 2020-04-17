@@ -44,15 +44,11 @@ class FileSpecFinder(object):
         self.path = path
         self.filename_pattern = pattern or self.filename_pattern
 
-        count = 0
         sys.path.append(path)
-
         path = os.path.join(path, "*.py")
-        for file in glob.iglob(path):
-            if self.import_single_filespec(file):
-                count += 1
-
+        count = sum(1 for file in glob.iglob(path) if self.import_single_filespec(file))
         sys.path.pop()
+
         logger.debug(f"Loaded {count} file configurations from '{path}'")
 
 
