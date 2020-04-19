@@ -124,6 +124,10 @@ class FWFFileReader(object):
         for f in file:
             self.mf.open(f)
 
+        if isinstance(self.mf, FWFMergeIndex):
+            # Release temp memory no longer needed            
+            self.mf.data.finish()
+
         if index:
             return self.mf
             
