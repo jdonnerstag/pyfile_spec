@@ -147,3 +147,10 @@ class FileSpecFinder(object):
             else:
                 raise
             
+
+    def by_name(self, name):
+        """Find by class name"""
+        for klass in self.all_subclasses(FileSpecification):
+            if klass.__name__ == name:
+                return klass()
+                
