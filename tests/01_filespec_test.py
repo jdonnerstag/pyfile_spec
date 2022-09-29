@@ -61,6 +61,9 @@ def test_constructor():
     with pytest.raises(Exception):
         spec.SKIP_ROWS = "test"     # type: ignore
 
+    # Test that field can be empty
+    spec.FIELDSPECS = []
+
 
 def test_enabled():
     spec = HumanFile()

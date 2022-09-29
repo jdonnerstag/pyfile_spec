@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-"""Utilities to load File Specifications and to find the appropriate
-specification for a file.
-"""
+"""A registry for file specifications """
 
 import os
 import re
@@ -11,6 +9,8 @@ import sys
 import importlib
 import logging
 from pathlib import Path
+from typing import Iterator
+from datetime import datetime
 
 from .filespec import FileSpecification
 
@@ -18,15 +18,15 @@ logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
 
 
-def import_from(dir_or_file: Path, file_pattern: None|str = r"\w\d+[_-](.+).py") -> list[Path]:
+def import_from(dir_or_file: Path, file_pattern: str) -> list[Path]:
     """Add all filespecs from the directory provided
 
     In fact this is function is more generic then just loading file specs.
     It essentially imports python modules and assumes that this module
     contains a file specification. But it can be anything.
 
-    If 'dir_or_file' is a directory, then the 'file_pattern' is
-    used to find matching file names. This is prevent that
+    If 'dir_or_file' is a directory, then 'file_pattern' is
+    used to find matching file names. This is to prevent that
     readme files or 'disabled' files are accidentially imported.
     """
     if dir_or_file.is_dir():
@@ -69,13 +69,15 @@ class FileSpecFinderException(Exception):
 
 
 class Registry:
-    """Find the appropriate specification for a specific file"""
+    """A registry for File Specifications"""
 
-    def __init__(self, registry_path: None|Path=None, filename_pattern:str|None=None):
+    def __init__(self, registry_path: None|Path, filename_pattern:str = r"[^_].+\.py"):
 
         if registry_path:
+            # Import the python files which contain the FileSpecification(s)
             import_from(registry_path, filename_pattern)
 
+        # Create instances for each file spec defined in the modules just loaded
         self.registry: list[FileSpecification] = [spec() for spec in self._all_filespecs()]
 
 
@@ -92,7 +94,7 @@ class Registry:
         return sorted(rtn, key=lambda x: x.__module__)
 
 
-    def find_first(self, file: str, **kwargs) -> FileSpecification:
+    def find_first(self, file: str, effective_date:datetime, **kwargs) -> FileSpecification:
         """Return the first filespec suitable to process the 'file'"""
 
         # Find the first filespec that is enabled and matching the
@@ -100,25 +102,15 @@ class Registry:
         # the user can easily determine and change which filespec
         # is being used.
         for spec in self.registry:
-            if spec.is_eligible(file, **kwargs):
+            if spec.is_eligible(file, effective_date, **kwargs):
                 logger.debug("File type: %s <= %s", spec.__class__.__name__, file)
                 return spec
 
-        raise FileSpecFinderException(f"File spec not found for: {file}, {kwargs}")
+        raise FileSpecFinderException(f"No file spec found for: {file}, {kwargs}")
 
 
-    def __getitem__(self, name: str) -> FileSpecification:
-        """Find by class name"""
-        for klass in self.registry:
-            if self.name(klass) == name:
-                return klass
-
-        raise FileSpecFinderException(
-            f"FileSpecification not found: '{name}'")
-
-
-    def __keys__(self) -> list[str]:
-        return [self.name(spec) for spec in self.registry]
+    def __iter__(self) -> Iterator[FileSpecification]:
+        return iter(self.registry)
 
 
     def __len__(self) -> int:

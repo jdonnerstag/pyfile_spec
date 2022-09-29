@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-""" File Specifications
-"""
-
+""" File Specifications """
 
 import inspect
 import re
@@ -14,6 +12,7 @@ from datetime import datetime
 from typing import Any, TypeVar, Pattern
 import fwf_db
 from .generic_reader import GenericFileReader
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -51,21 +50,18 @@ class FileSpecification:
       them (apply changes) to determine the content for a specific (effective) date
       and optionally relevant period. The implementation is decoupled, but leveraging
       the file spec for configuration and file spec specific logic.
-    - ENABLED etc. are class variables. They are not accessed directly, but only via
-      associated getter functions (e.g. __enabled__()), which default read the ENABLED
-      variable. This is to make it very easy for user to create and maintain these files.
-      In some scenarios, the file specifications are maintained by client IT departments,
-      and for them it must be as easily as possible.
+    - ENABLED etc. are class variables. Modifying them will create an instance
+      variable, if the value has changed and if validation passed. Validation is
+      via 'validated_ENABLED()' which must exist for every (upper-case) config value.
     """
 
-    # This specification is valid during this timeframe. Entries are
-    # strings in the form "yyyy-mm-dd"  [<from>, <to>]. Lower and upper
-    # bounds are inclusive, e.g. ["2018-01-01", "2018-12-31"].
-    # Additionally None, True and False are supported
+    # File specs can enabled (True) or disabled (False), or enabled for a specific
+    # timeframe (e.g. [<from>, <to>] with values like "yyyy-mm-dd"). Lower-bound is
+    # inclusive, upper-bound is exclusive, e.g. ["2018-01-01", "2018-02-01"].
+    # None for <from> or <to>, means to ignore these tests.
     ENABLED: bool|tuple[None|TDATE, None|TDATE] = True
 
-    # These are defaults that will be added to each record of a filespec,
-    # if needed
+    # Defaults that can be added to each record of a filespec, if needed
     FIELDSPEC_DEFAULTS: dict[str, Any] = {
         # e.g. "dtype": "string"
     }
@@ -77,13 +73,15 @@ class FileSpecification:
     # key value pairs depend on the reader. "name" however is mandatory.
     FIELDSPECS: list[dict[str, Any]] = []
 
-    # When searching for file specs by file name, then the file patterns
-    # can be provided here.
+    # One registry use case is to search for a file specs by the file name.
+    # You may provide one or more file name pattern (glob or regex).
+    # Providing no pattern, is like disabling the spec.
     FILE_PATTERN: str|tuple[str, ...] = ()
 
     # If FILE_PATTERN matches full and delta or diff files, then we need a
     # way to identify full files. Fill in the file pattern for full files
     # here.
+    # TODO: Don't understand the explanation
     FULL_FILES: None|tuple[str, ...] = None
 
     # For some file formats (csv, fwf) the line ending is relevant.
@@ -103,21 +101,25 @@ class FileSpecification:
     SHEET: str|int = 0
 
     # Pandas read_excel index_col argument
-    # TODO Find a way to add reader specific config
+    # TODO Find a way to add reader specific configs, e.g. mixin?
     INDEX_COL = None
 
-    # Exclude records based on the effective date. By default that is today(),
-    # but can be any date if data reflecting a specific point in time are needed.
-    # Must be a tuple or list with 2 elements: [<from>, <to>].
+    # Assume you want to run the system with an effective-date, different
+    # from today(). All data provided or changed after this date, must be ignored.
+    # That might the datetime derived from a filename, or some field in a table.
+    # Here we define the table field names used to compare against.
+    # Must be a tuple or list with 2 elements: [<from-field>, <to-field>].
     # E.g. ("BUSINESS_DATE", None)
     EFFECTIVE_DATE_FIELDS: None|tuple[str|None, str|None] = None
 
-    # Exclude records which are not relevant for a specific period (e.g. month)
+    # Lets assume you want to process the data from last month, then all files
+    # and all filters from before or after must be ignored.
+    # Here we define the table field names used to compare against.
     # E.g. ("VALID_FROM", "VALID_TO")
     PERIOD_DATE_FIELDS: None|tuple[str, str] = None
 
     # A regex to extract the date/time from the file name
-    # You may also subclass datetime_from_filename() if the regex approach is
+    # You may subclass extract_datetime_from_filename() if the regex approach is
     # not sufficient.
     DATE_FROM_FILENAME_REGEX: None|str = r"\.(\d{8,14})\."
 
@@ -139,17 +141,6 @@ class FileSpecification:
             f"Invalid value for '{varname}': '{data}'")
 
 
-    def _to_tuple_of_2(self, name: str, data) -> tuple[T, T]:
-        if isinstance(data, list) and len(data) == 2:
-            return tuple(data)
-
-        if isinstance(data, tuple) and len(data) == 2:
-            return data
-
-        raise FileSpecificationException(
-            f"{name}: Expected a tuple or list with 2 elements: '{data}'")
-
-
     # pylint: disable=invalid-name
     def validate_ENABLED(self, data) -> bool|tuple[datetime|None, datetime|None]:
         """This specification is valid during this timeframe.
@@ -163,8 +154,10 @@ class FileSpecification:
         if isinstance(data, bool):
             return data
 
-        data = self._to_tuple_of_2("ENABLED", data)
-        data = tuple(self.to_date(x, default=None) for x in data)
+        if isinstance(data, (list, tuple)) and len(data) == 2:
+            data = tuple(self.to_date(x, default=None) for x in data)
+        else:
+            self.validation_error(data)
 
         # afrom >= bto is an accepted approach to disable a filespec
         return data
@@ -201,10 +194,10 @@ class FileSpecification:
                 if not isinstance(elem, dict):
                     return self.validation_error(data)
 
-                if all(isinstance(key, str) for key in elem.keys()):
-                    return data
+                if not all(isinstance(key, str) for key in elem.keys()):
+                    return self.validation_error(data)
 
-                return self.validation_error(data)
+            return data
 
         return self.validation_error(data)
 
@@ -224,12 +217,12 @@ class FileSpecification:
         else:
             return self.validation_error(data)
 
-        # Detect possible errors early
         for pat in data:
             if isinstance(pat, str):
-                re.compile(pat)
+                re.compile(self._glob_to_regex(pat))
 
         return data
+
 
     # pylint: disable=invalid-name
     def validate_FULL_FILES(self, data) -> None|tuple[str, ...]:
@@ -415,8 +408,10 @@ class FileSpecification:
         self.fields = fwf_db.FWFFileFieldSpecs(self.FIELDSPECS)
         self.fields.apply_defaults(self.FIELDSPEC_DEFAULTS)
 
+        # Validate all configurations
         self.validate()
 
+        # For easy extension by subclasses
         self.init()
 
 
@@ -429,6 +424,7 @@ class FileSpecification:
 
         validate = "validate_"
         for varname in dir(self):
+            # validate_XYZ() -> Make sure XYZ exists
             if varname.startswith(validate):
                 config = varname[len(validate):]
                 if config.isupper():
@@ -439,6 +435,9 @@ class FileSpecification:
                         raise FileSpecificationException(
                             f"'Missing the '{config}' variable matching '{varname}'")
 
+            # E.g. ENABLED -> Make sure validate_XYZ() exists and the value
+            # validates successful. If validation "refines" the value, store
+            # that value in an instance variable (vs class) with the same name.
             if varname.isupper():
                 func_name = validate + varname
                 try:
@@ -453,6 +452,7 @@ class FileSpecification:
 
 
     def __setattr__(self, name: str, value) -> None:
+        # If e.g. ENABLED, then do self.ENABLED = self.validate_ENABLED(self.ENABLED)
         if name.isupper():
             cur_value = getattr(self, name)
             func_name = f"validate_{name}"
@@ -470,18 +470,15 @@ class FileSpecification:
         super().__setattr__(name, value)
 
 
-    def _is_sequence_of(self, data, list_type, flen:int, field_type) -> bool:
-        if not isinstance(data, list_type):
-            return False
-
-        if flen > 0 and len(data) != flen:
-            return False
-
-        return all(isinstance(x, field_type) for x in data)
-
-
     def to_date(self, date: TDATE|None, fmt: str="%Y%m%d", **kwargs) -> None|datetime:
-        """Convert value to datetime"""
+        """Convert value to datetime
+
+        Support int and string.
+        If string, automatically remove any "-".
+        Convert into a datetime.
+        If date is None, then return the 'default' argument if provided,
+        else today().
+        """
         rtn = date or kwargs.get("default", datetime.today())
         if rtn is None:
             return None
@@ -535,12 +532,21 @@ class FileSpecification:
         return True
 
 
-    def is_eligible(self, file: str, effective_date:datetime) -> bool:
-        """Return true, if this file spec is suitable and applicable
-        for loading the file.
+    def file_filter(self, file: str, effective_date:datetime) -> bool:
+        """Determine datetime from the file name, typically alluding to
+        when the file was "created" and compare it against the effective date.
 
-        By subsclassing self.match_file() it is possible for the file spec
-        to provide whatever additional filter needed.
+        If the file-system create/modify time is better suited, simply
+        subclass this method.
+        """
+
+        file_date = self.datetime_from_filename(file)
+        return (file_date is None) or (file_date <= effective_date)
+
+
+    def is_eligible(self, file: str, effective_date:datetime) -> bool:
+        """Return true, if this file spec is a) active and b) eligible
+        for loading the file.
         """
 
         if not self.is_active(effective_date):
@@ -550,19 +556,7 @@ class FileSpecification:
         if not self._fnmatch_multiple(file, file_pattern):
             return False
 
-        return self.file_filter(file, effective_date=effective_date)
-
-
-    def file_filter(self, file: str, effective_date:datetime) -> bool:
-        """Let's assume the file spec has been identified as applicable for the
-        file, but for a given period or effective date, it might be that the
-        file is not relevant and thus can be skipped.
-
-        This method can be replaced or leveraged in a subclass
-        """
-
-        file_date = self.datetime_from_filename(file)
-        return (file_date is None) or (file_date <= effective_date)
+        return self.file_filter(file, effective_date)
 
 
     def _fnmatch_multiple(self, file: str, pattern: str|tuple[str, ...]) -> bool:
@@ -574,26 +568,25 @@ class FileSpecification:
         return any(self._fnmatch(file, pat) for pat in pattern)
 
 
-    def _fnmatch(self, file: str, pattern: str) -> bool:
-        """Return true if the file matches the (single) pattern"""
-
-        fbase = os.path.basename(file)
-        if fnmatch.fnmatch(fbase, pattern):
-            return True
-
-        # Also support file name glob pattern
-        file = file.replace("\\", "/")
+    def _glob_to_regex(self, pattern: str) -> str:
         pattern = pattern.replace(".", "\\.")
         pattern = pattern.replace("*", ".*")
         pattern = pattern.replace("/.*.*/", "(/.*)?/")
         pattern = "(^|/)" + pattern
+        return pattern
+
+
+    def _fnmatch(self, file: str, pattern: str) -> bool:
+        """Return true if the file matches the (single) pattern"""
+
+        file = file.replace("\\", "/")
+        pattern = self._glob_to_regex(pattern)
 
         try:
             pat = re.compile(pattern)
             return pat.search(file) is not None
-        except:  #pylint: disable=bare-except
-            logger.warning("Invalid regex in File spec ignored: '%s'", pattern)
-            return False
+        except Exception as exc:
+            raise FileSpecificationException(f"Invalid regex: '{pattern}'") from exc
 
 
     def is_full(self, file: str) -> bool:
@@ -654,8 +647,14 @@ class FileSpecification:
         assert self.READER, "Missing READER configuration"
         assert file, "Parameter 'file' must not be empty"
 
-        if not self.is_active(effective_date):
-            raise FileSpecificationException(f"Filespec is inactive for date '{effective_date}")
+        if isinstance(file, str):
+            if not self.is_eligible(file, effective_date):
+                raise FileSpecificationException(
+                    f"Filespec is not eligible for '{file}' and date '{effective_date}'")
+        else:
+            if not self.is_active(effective_date):
+                raise FileSpecificationException(
+                    f"Filespec is inactive for date '{effective_date}")
 
         return GenericFileReader(self).load(file,
             period_from = period_from,
