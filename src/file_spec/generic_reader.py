@@ -5,11 +5,7 @@
 """Map names to a reader implementation"""
 
 import logging
-from datetime import datetime
 
-from fwf_db import FWFFile
-from fwf_db.fwf_pandas import FWFPandas
-from fwf_db.fwf_operator import FWFOperator as op
 from .excel_file_reader import ExceFileReader
 from .fwf_file_reader import FWFFileReader
 

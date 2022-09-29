@@ -27,7 +27,7 @@ class ExceFileReader(object):
 
     def __init__(self, filespec):
         self.filespec = filespec
-        self.fieldspecs = self.filespec.FIELDSPECS 
+        self.fieldspecs = self.filespec.FIELDSPECS
 
         self.sheet = getattr(filespec, "SHEET", 0)
         self.skip_rows = getattr(filespec, "SKIP_ROWS", 0)
@@ -52,7 +52,7 @@ class ExceFileReader(object):
 
             # If a dtype is included, we don't want Pandas to make a guess itself.
             # E.g. number with leading 0's (e.g. MSISDN) would be converted into ints.
-            self.dtype = dict()
+            self.dtype = {}
             for x in self.fieldspecs:
                 if ("dtype" in x) and not x["dtype"].startswith("int"):
                     self.dtype[x["name"]] = x["dtype"]
@@ -75,11 +75,11 @@ class ExceFileReader(object):
     def load_file(self, file, **kvargs):
         """Applying the filespec import the data from an excel file"""
 
-        return pd.read_excel(file, 
-                usecols=self.names, 
-                sheet_name=self.sheet, 
-                dtype=self.dtype, 
-                skiprows=self.skip_rows, 
+        return pd.read_excel(file,
+                usecols=self.names,
+                sheet_name=self.sheet,
+                dtype=self.dtype,
+                skiprows=self.skip_rows,
                 index_col=self.index_col
         )
 
@@ -124,7 +124,7 @@ class ExceFileReader(object):
 
     def filter_effective_date(self, df, effective_date):
         """Apply the commission period to the data frame and remove all records which are
-        not effective in that commission period, considering the effective start and 
+        not effective in that commission period, considering the effective start and
         end dates in the excel.
         Records must be effective at the end of the commission period, e.g. 31.01.2019 23:59:59
         """
@@ -159,7 +159,7 @@ class ExceFileReader(object):
         col_start_date = cols
         if isinstance(cols, list) and len(cols) > 0:
             col_start_date = cols[0]
-        
+
         col_end_date = None
         if isinstance(cols, list) and len(cols) > 1:
             col_end_date = cols[1]
