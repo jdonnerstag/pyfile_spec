@@ -3,11 +3,11 @@
 
 """ File Specifications """
 
-import inspect
-import re
 import os
-import fnmatch
+import re
+import inspect
 import logging
+from pathlib import Path
 from datetime import datetime
 from typing import Any, TypeVar, Pattern
 import fwf_db
@@ -512,12 +512,12 @@ class FileSpecification:
         from (inclusive) <= effective date < to (exclusive)
         """
 
-        if effective_date is None:
-            return True
-
         enabled = self.ENABLED
         if isinstance(enabled, bool):
             return enabled
+
+        if effective_date is None:
+            return True
 
         # Pylint false-positive
         # pylint: disable=not-an-iterable
@@ -532,7 +532,7 @@ class FileSpecification:
         return True
 
 
-    def file_filter(self, file: str, effective_date:datetime) -> bool:
+    def file_filter(self, file: str, effective_date:datetime|None) -> bool:
         """Determine datetime from the file name, typically alluding to
         when the file was "created" and compare it against the effective date.
 
@@ -540,11 +540,14 @@ class FileSpecification:
         subclass this method.
         """
 
+        if effective_date is None:
+            return True
+
         file_date = self.datetime_from_filename(file)
         return (file_date is None) or (file_date <= effective_date)
 
 
-    def is_eligible(self, file: str, effective_date:datetime) -> bool:
+    def is_eligible(self, file: str, effective_date:datetime|None) -> bool:
         """Return true, if this file spec is a) active and b) eligible
         for loading the file.
         """
@@ -661,3 +664,29 @@ class FileSpecification:
             period_to = period_to,
             effective_date = effective_date
         )
+
+
+    @classmethod
+    def name(cls) -> str:
+        """The name for the file specification"""
+        return cls.__name__
+
+
+    @classmethod
+    def module(cls) -> str:
+        """The python module where the specification has been defined"""
+        return cls.__module__
+
+
+    @classmethod
+    def filename(cls) -> Path:
+        """The file name where the specification has been defined"""
+        return Path(inspect.getfile(cls))
+
+
+    def __repr__(self) -> str:
+        return f"FileSpecification('{self.name()}', '{os.path.basename(self.filename())}')"
+
+
+    def __str__(self) -> str:
+        return repr(self)
