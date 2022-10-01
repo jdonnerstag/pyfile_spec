@@ -27,6 +27,8 @@ US       ME20080503F0f51da89a299Kelly Crose             Whatever    Comedian    
 
 class HumanFile(FileSpecification):
 
+    READER = "fwf"
+
     FIELDSPECS = [
         {"name": "location", "len": 9},
         {"name": "state", "len": 2},
@@ -75,9 +77,10 @@ def test_enabled():
 
     # But this is not working???  Or at least pylint is complaining.
     # The compiler is still doing the right thing, I belief
-    assert HumanFile.READER is None
+    spec.READER = None
+    assert HumanFile.READER == "fwf"
+    assert spec.READER is None
     spec.READER = "fwf"
-    assert HumanFile.READER is None
     assert spec.READER == "fwf"
 
     spec.ENABLED = True

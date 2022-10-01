@@ -9,10 +9,11 @@ import inspect
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Any, TypeVar, Pattern
+from typing import Any, TypeVar, Pattern, Type
 import fwf_db
-from .generic_reader import GenericFileReader
 
+# TODO We somehow need a means to configure allow configs. It's to confusing right now.
+#      Some list with the names, which can be extended, or something like this.
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
@@ -102,15 +103,13 @@ class FileSpecification:
 
     # Pandas read_excel index_col argument
     # TODO Find a way to add reader specific configs, e.g. mixin?
-    INDEX_COL = None
+    INDEX_COL: int|str|None = None
 
     # Assume you want to run the system with an effective-date, different
     # from today(). All data provided or changed after this date, must be ignored.
-    # That might the datetime derived from a filename, or some field in a table.
-    # Here we define the table field names used to compare against.
-    # Must be a tuple or list with 2 elements: [<from-field>, <to-field>].
-    # E.g. ("BUSINESS_DATE", None)
-    EFFECTIVE_DATE_FIELDS: None|tuple[str|None, str|None] = None
+    # That might be the datetime derived from a filename, or some field in a table.
+    # Here we define the table field name,  e.g. "MODIFIED"
+    EFFECTIVE_DATE_FIELD: None|str = None
 
     # Lets assume you want to process the data from last month, then all files
     # and all filters from before or after must be ignored.
@@ -327,30 +326,19 @@ class FileSpecification:
 
 
     # pylint: disable=invalid-name
-    def validate_EFFECTIVE_DATE_FIELDS(self, data) -> None|tuple[str|None, str|None]:
+    def validate_EFFECTIVE_DATE_FIELD(self, data) -> None|str:
         """Exclude records based on the effective date.
 
-        By default that is today(), but can be any date if data
-        reflecting a specific point in time are needed.
-        Must be a tuple or list with 2 elements: [<from-field>, <to-field>],
-        with <from-field> and <to-field> being field names.
+        By default the effective-date is today(), but it can be any
+        date if data reflecting a specific point in time are needed.
 
-        E.g. ("BUSINESS_DATE", None)
+        The test is inclusive, meaning that if effective-date is
+        today, then all data up and including today/now, are effective.
         """
         if data is None:
             return data
 
-        if data is None:
-            return None
-
-        if isinstance(data, list) and len(data) == 2:
-            data = tuple(data)
-        elif isinstance(data, tuple) and len(data) == 2:
-            pass
-        else:
-            return self.validation_error(data)
-
-        if all(x is None or isinstance(x, str) for x in data):
+        if isinstance(data, str):
             return data
 
         return self.validation_error(data)
@@ -396,6 +384,21 @@ class FileSpecification:
         return data
 
 
+    def new_filespec(self) -> fwf_db.FileFieldSpecs:
+        """Return a specific FileFieldSpec for READER"""
+
+        reader = self.READER
+
+        # The user might provide his own reader implementation
+        if isinstance(reader, Type):
+            return reader(self.FIELDSPECS)  # pylint: disable=not-callable
+
+        if reader == "fwf":
+            return fwf_db.FWFFileFieldSpecs(self.FIELDSPECS)
+
+        return fwf_db.FileFieldSpecs[fwf_db.FieldSpec](dict, self.FIELDSPECS)
+
+
     # pylint: disable=invalid-name
     def validate_READER(self, data):
         """The file reader"""
@@ -405,18 +408,17 @@ class FileSpecification:
     def __init__(self):
         """Constructor"""
 
-        self.fields = fwf_db.FWFFileFieldSpecs(self.FIELDSPECS)
-        self.fields.apply_defaults(self.FIELDSPEC_DEFAULTS)
-
-        # Validate all configurations
-        self.validate()
-
-        # For easy extension by subclasses
         self.init()
 
 
     def init(self):
         """For easy extension by subclasses"""
+
+        self.fields = self.new_filespec()
+        self.fields.apply_defaults(self.FIELDSPEC_DEFAULTS)
+
+        # Validate all configurations
+        self.validate()
 
 
     def validate(self):
@@ -445,7 +447,8 @@ class FileSpecification:
                     assert callable(func)
                 except Exception as exc:
                     raise FileSpecificationException(
-                        f"'{func_name}' must exist and be a function") from exc
+                        f"Found a config with name '{varname}'. Corresponding "
+                        f"function '{func_name}' is missing") from exc
 
                 validated_value = getattr(self, varname)
                 setattr(self, varname, validated_value)
@@ -469,8 +472,11 @@ class FileSpecification:
 
         super().__setattr__(name, value)
 
+        if name == "FIELDSPECS":
+            self.init()
 
-    def to_date(self, date: TDATE|None, fmt: str="%Y%m%d", **kwargs) -> None|datetime:
+
+    def to_date(self, date: TDATE|None, fmt: str="%Y%m%d", **kvargs) -> None|datetime:
         """Convert value to datetime
 
         Support int and string.
@@ -479,7 +485,7 @@ class FileSpecification:
         If date is None, then return the 'default' argument if provided,
         else today().
         """
-        rtn = date or kwargs.get("default", datetime.today())
+        rtn = date or kvargs.get("default", datetime.today())
         if rtn is None:
             return None
 
@@ -626,44 +632,6 @@ class FileSpecification:
         exception if not found. Convert the string into a datetime
         """
         return self.to_date(self.extract_datetime_from_filename(file, regex), default=None)
-
-
-    def load_file(self, file: str|bytes,
-        effective_date: datetime,
-        period_from: None|bytes = None,
-        period_to: None|bytes = None
-    ):
-        """We essentially have 2 use cases: (a) find a matching file spec for a
-        file that arrived in some folder and then apply the spec to load the file,
-        and (b) users have configured a file spec for a manual file which they want
-        to load. The 2nd step for both is the same. This method represents that 2nd
-        step: apply the file provided to exactly this spec.
-
-        Being a commonly required functionality, loading the file includes filtering
-        the records according to the period and effective dates provided. Note that,
-        different to when we are searching for a matching spec, now that we have a
-        spec and a file, we do not (again) vaidate that the file actually complies
-        with the spec. It assume it is the users choices and loading the file with
-        this spec is exactly what he wants.
-        """
-
-        assert self.READER, "Missing READER configuration"
-        assert file, "Parameter 'file' must not be empty"
-
-        if isinstance(file, str):
-            if not self.is_eligible(file, effective_date):
-                raise FileSpecificationException(
-                    f"Filespec is not eligible for '{file}' and date '{effective_date}'")
-        else:
-            if not self.is_active(effective_date):
-                raise FileSpecificationException(
-                    f"Filespec is inactive for date '{effective_date}")
-
-        return GenericFileReader(self).load(file,
-            period_from = period_from,
-            period_to = period_to,
-            effective_date = effective_date
-        )
 
 
     @classmethod

@@ -122,7 +122,7 @@ class FileSpecRegistry:
         return sorted(rtn, key=lambda x: x.__module__)
 
 
-    def find_first(self, file: str, effective_date:datetime, **kwargs) -> FileSpecification:
+    def find_first(self, file: str, effective_date:datetime, **kvargs) -> FileSpecification:
         """Return the first filespec suitable to process the 'file'"""
 
         # Find the first filespec that is enabled and matching the
@@ -130,11 +130,11 @@ class FileSpecRegistry:
         # the user can easily determine and change which filespec
         # is being used.
         for spec in self:
-            if spec.is_eligible(file, effective_date, **kwargs):
+            if spec.is_eligible(file, effective_date, **kvargs):
                 logger.debug("File type: %s <= %s", spec.__class__.__name__, file)
                 return spec
 
-        raise KeyError(f"No file spec found for: {file}, {kwargs}")
+        raise KeyError(f"No file spec found for: {file}, {kvargs}")
 
 
     def __getitem__(self, name: str) -> FileSpecification:

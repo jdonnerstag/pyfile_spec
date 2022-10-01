@@ -29,7 +29,7 @@ US       ME20080503F0f51da89a299Kelly Crose             Whatever    Comedian    
 class HumanFile(FileSpecification):
 
     FIELDSPECS = [
-        {"name": "location", "len": 9}, 
+        {"name": "location", "len": 9},
         {"name": "state", "len": 2},
         {"name": "birthday", "len": 8},
         {"name": "gender", "len": 1},
@@ -65,7 +65,7 @@ class FwFTestData(FileSpecification):
 
     READER = "fwf"
     PERIOD_DATE_FIELDS = ["valid_from", "valid_until"]
-    EFFECTIVE_DATE_FIELDS = ["changed", None]
+    EFFECTIVE_DATE_FIELD = ["changed", None]
     INDEX = None
 
 
@@ -76,7 +76,7 @@ def test_constructor():
 
     reader = FWFFileReader(spec)
     assert reader
-    
+
 
 def test_read_fwf_data():
 
@@ -89,7 +89,7 @@ def test_read_fwf_data():
 def test_fwf_with_effective_date_filter():
 
     spec = HumanFile()
-    spec.EFFECTIVE_DATE_FIELDS = "birthday"
+    spec.EFFECTIVE_DATE_FIELD = "birthday"
     spec["birthday"]["dtype"] = "int32"
 
     df = FWFFileReader(spec).load(DATA, effective_date=datetime(2000, 1, 1))
@@ -121,7 +121,7 @@ def test_fwf_with_period_filter():
     assert list(df.columns) == list(spec.fieldSpecNames)
 
     df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180101, period_until=20180131)
-    assert len(df.index) == 2   # 
+    assert len(df.index) == 2   #
     assert list(df.columns) == list(spec.fieldSpecNames)
 
     df = FWFFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180201, period_until=20180229)
@@ -167,7 +167,7 @@ def test_fwf_index():
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
-            assert x.lines == [i] 
+            assert x.lines == [i]
 
     spec.INDEX = dict(index="ID", unique_index=False, integer_index=False)
     with FWFFileReader(spec) as fd:
@@ -178,7 +178,7 @@ def test_fwf_index():
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
-            assert x.lines == [i] 
+            assert x.lines == [i]
 
 
 def test_fwf_unique_index():
@@ -191,7 +191,7 @@ def test_fwf_unique_index():
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == int(ii)
             assert x
-            assert x.lineno == i 
+            assert x.lineno == i
             assert x.line.decode().startswith(ii)
 
 
@@ -207,7 +207,7 @@ def test_fwf_integer_index():
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
-            assert x.lines == [i] 
+            assert x.lines == [i]
 
     spec.INDEX = dict(index="ID", unique_index=True, integer_index=True)
     with FWFFileReader(spec) as fd:
@@ -216,7 +216,7 @@ def test_fwf_integer_index():
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == ii
             assert x
-            assert x.lineno == i 
+            assert x.lineno == i
             assert x.line.decode().startswith(str(ii) + " ")
 
 
@@ -224,5 +224,5 @@ def test_fwf_integer_index():
 if __name__ == '__main__':
 
     pytest.main(["-v", "/tests"])
-    
+
     #test_constructor()

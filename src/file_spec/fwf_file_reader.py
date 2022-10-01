@@ -30,7 +30,7 @@ class FWFFileReader(object):
         self.index = getattr(filespec, "INDEX", None)
 
         # TODO currently we validate the fields much later. To detect errors earlier ...
-        self.effective_date_fields = getattr(filespec, "EFFECTIVE_DATE_FIELDS", None)
+        self.EFFECTIVE_DATE_FIELD = getattr(filespec, "EFFECTIVE_DATE_FIELD", None)
         self.period_date_fields = getattr(filespec, "PERIOD_DATE_FIELDS", None)
 
         self.fd = None  # File descriptor
@@ -142,7 +142,7 @@ class FWFFileReader(object):
         # Determine effective date and apply
         # Determine period and apply
         fd_filtered = FWFCython(file).apply(
-            self.effective_date_fields, effective_date,
+            self.EFFECTIVE_DATE_FIELD, effective_date,
             self.period_date_fields, [period_from, period_until],
             index=index,
             unique_index=unique_index,
@@ -216,7 +216,7 @@ class FWFFileReader(object):
 
     def to_dtype(self, df, field, obj):
         dtype = df.dtypes[field]
-        if dtype.name == "datetime64[ns]":
+        if dtype.name == "datetime64[s]":
             return self.to_datetime(obj)
 
         raise FWFFileReaderException(f"Auo-converter for dtype {dtype} not yet supported")

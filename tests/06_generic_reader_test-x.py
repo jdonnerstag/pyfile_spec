@@ -19,18 +19,18 @@ class Excel_1(FileSpecification):
         {"name": "attr_text"},
         {"name": "attr_int"},
         {"name": "attr_any"},
-        {"name": "valid_from", "dtype": "datetime64", "default": datetime(1999, 1, 1)},	
-        {"name": "valid_until", "dtype": "datetime64", "default": datetime(2199, 12, 31)},
-        {"name": "changed", "dtype": "datetime64"}, # only an example
+        {"name": "valid_from", "dtype": "datetime64[s]", "default": datetime(1999, 1, 1)},
+        {"name": "valid_until", "dtype": "datetime64[s]", "default": datetime(2199, 12, 31)},
+        {"name": "changed", "dtype": "datetime64[s]"}, # only an example
     ]
 
     READER = "excel"
-    
+
     SHEET = 0      # The first sheet in the file
-    
+
     SKIP_ROWS = 10
 
-    EFFECTIVE_DATE_FIELDS = None
+    EFFECTIVE_DATE_FIELD = None
     PERIOD_DATE_FIELDS = None
 
 
@@ -59,7 +59,7 @@ def test_excel():
 def test_excel_with_effective_date():
 
     spec = Excel_1()
-    spec.EFFECTIVE_DATE_FIELDS = "changed"
+    spec.EFFECTIVE_DATE_FIELD = "changed"
 
     df = GenericFileReader(spec).load("./examples/excel_1.xlsx")
     assert len(df.index) == 8
@@ -99,7 +99,7 @@ US       ME20080503F0f51da89a299Kelly Crose             Whatever    Comedian    
 class HumanFile(FileSpecification):
 
     FIELDSPECS = [
-        {"name": "location", "len": 9}, 
+        {"name": "location", "len": 9},
         {"name": "state", "len": 2},
         {"name": "birthday", "len": 8},
         {"name": "gender", "len": 1},
@@ -137,7 +137,7 @@ class FwFTestData(FileSpecification):
 
     READER = "fwf"
     PERIOD_DATE_FIELDS = ["valid_from", "valid_until"]
-    EFFECTIVE_DATE_FIELDS = ["changed", None]
+    EFFECTIVE_DATE_FIELD = ["changed", None]
 
 
 def test_read_fwf_data():
@@ -151,7 +151,7 @@ def test_read_fwf_data():
 def test_fwf_with_effective_date_filter():
 
     spec = HumanFile()
-    spec.EFFECTIVE_DATE_FIELDS = "birthday"
+    spec.EFFECTIVE_DATE_FIELD = "birthday"
     spec["birthday"]["dtype"] = "int32"
 
     df = GenericFileReader(spec).load(DATA, effective_date=datetime(2000, 1, 1))
@@ -171,7 +171,7 @@ def test_fwf_with_period_filter():
     assert list(df.columns) == list(spec.fieldSpecNames)
 
     df = GenericFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180101, period_until=20180131)
-    assert len(df.index) == 2   # 
+    assert len(df.index) == 2   #
     assert list(df.columns) == list(spec.fieldSpecNames)
 
     df = GenericFileReader(spec).load(DATA_FWF_EFFECTIVE_PERIOD, period_from=20180601, period_until=20180630, effective_date=20180630)
@@ -192,7 +192,7 @@ def test_fwf_index():
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
-            assert x.lines == [i] 
+            assert x.lines == [i]
 
 
 def test_fwf_unique_index():
@@ -205,7 +205,7 @@ def test_fwf_unique_index():
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == int(ii)
             assert x
-            assert x.lineno == i 
+            assert x.lineno == i
             assert x.line.decode().startswith(ii)
 
 
@@ -221,7 +221,7 @@ def test_fwf_integer_index():
             assert x
             assert len(x) == 1
             assert x[0].lineno == i
-            assert x.lines == [i] 
+            assert x.lines == [i]
 
     spec.INDEX = dict(index="ID", unique_index=True, integer_index=True)
     with GenericFileReader(spec) as fd:
@@ -230,7 +230,7 @@ def test_fwf_integer_index():
         for i, (ii, x) in enumerate(idx):
             assert i + 1 == ii
             assert x
-            assert x.lineno == i 
+            assert x.lineno == i
             assert x.line.decode().startswith(str(ii) + " ")
 
 
@@ -238,5 +238,5 @@ def test_fwf_integer_index():
 if __name__ == '__main__':
 
     pytest.main(["-v", "/tests"])
-    
+
     #test_constructor()

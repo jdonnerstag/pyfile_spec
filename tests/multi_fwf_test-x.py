@@ -26,7 +26,7 @@ class FwFTestData(FileSpecification):
 
     READER = "fwf"
     PERIOD_DATE_FIELDS = ["valid_from", "valid_until"]
-    EFFECTIVE_DATE_FIELDS = ["changed", None]
+    EFFECTIVE_DATE_FIELD = ["changed", None]
     INDEX = "ID"
 
 
@@ -37,7 +37,7 @@ def test_constructor():
 
     reader = FWFFileReader(spec)
     assert reader
-    
+
 
 def test_single_file():
 
@@ -81,5 +81,5 @@ def test_multi_file():
 if __name__ == '__main__':
 
     pytest.main(["-v", "/tests"])
-    
+
     #test_constructor()
