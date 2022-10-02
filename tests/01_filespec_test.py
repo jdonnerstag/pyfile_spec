@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pytest
 
-from file_spec.filespec import FileSpecification, FileSpecificationException
+from file_spec.filespec import FileSpecification, FileSpecificationException, to_date
 
 
 DATA = b"""# My comment test
@@ -28,6 +28,7 @@ US       ME20080503F0f51da89a299Kelly Crose             Whatever    Comedian    
 class HumanFile(FileSpecification):
 
     READER = "fwf"
+    FILE_PATTERN = "*.dat"
 
     FIELDSPECS = [
         {"name": "location", "len": 9},
@@ -114,30 +115,30 @@ def test_enabled():
         spec.ENABLED = ["1999-12-31"]    # type: ignore
 
     spec.ENABLED = [20190101, 20200101]     # type: ignore
-    assert spec.is_active(spec.to_date(20181231)) is False
-    assert spec.is_active(spec.to_date(20190101)) is True
-    assert spec.is_active(spec.to_date(20191231)) is True
-    assert spec.is_active(spec.to_date(20200101)) is False
+    assert spec.is_active(to_date(20181231)) is False
+    assert spec.is_active(to_date(20190101)) is True
+    assert spec.is_active(to_date(20191231)) is True
+    assert spec.is_active(to_date(20200101)) is False
 
     spec.ENABLED = ["20190101", 20200101]       # type: ignore
-    assert spec.is_active(spec.to_date(20181231)) is False
-    assert spec.is_active(spec.to_date(20190101)) is True
-    assert spec.is_active(spec.to_date(20191231)) is True
-    assert spec.is_active(spec.to_date(20200101)) is False
+    assert spec.is_active(to_date(20181231)) is False
+    assert spec.is_active(to_date(20190101)) is True
+    assert spec.is_active(to_date(20191231)) is True
+    assert spec.is_active(to_date(20200101)) is False
 
     spec.ENABLED = [None, None]         # type: ignore
     assert spec.is_active(datetime.min) is True
     assert spec.is_active(datetime.max) is True
 
     spec.ENABLED = [None, "2020-01-01"]     # type: ignore
-    assert spec.is_active(spec.to_date(datetime.min)) is True
-    assert spec.is_active(spec.to_date(20191231)) is True
-    assert spec.is_active(spec.to_date(20200101)) is False
+    assert spec.is_active(to_date(datetime.min)) is True
+    assert spec.is_active(to_date(20191231)) is True
+    assert spec.is_active(to_date(20200101)) is False
 
     spec.ENABLED = ["2019-01-01", None]     # type: ignore
-    assert spec.is_active(spec.to_date(20181231)) is False
-    assert spec.is_active(spec.to_date(20190101)) is True
-    assert spec.is_active(spec.to_date(datetime.max)) is True
+    assert spec.is_active(to_date(20181231)) is False
+    assert spec.is_active(to_date(20190101)) is True
+    assert spec.is_active(to_date(datetime.max)) is True
 
     spec.ENABLED = ["199912", "19991201"]   # type: ignore
     spec.ENABLED = ["2018-01-02", "2018-01-01"]     # type: ignore # wrong order
@@ -169,7 +170,6 @@ def test_filepattern():
     spec = HumanFile()
 
     # No or empty FILE_PATTERN => never match
-    assert not spec.FILE_PATTERN
     assert spec.is_eligible("test.csv", today) is False
 
     # No or empty FILE_PATTERN => never match
@@ -312,31 +312,35 @@ def test_is_full():
 def test_datetime_from_filename():
     spec = HumanFile()
 
-    with pytest.raises(Exception):
-        spec.datetime_from_filename("test.csv")
+    regex = spec.DATE_FROM_FILENAME_REGEX
+    assert regex is not None
 
     with pytest.raises(Exception):
-        spec.datetime_from_filename("test.1234567.csv")
+        spec.datetime_from_filename("test.csv", regex)
 
     with pytest.raises(Exception):
-        spec.datetime_from_filename("test.2018-02-02.csv")
+        spec.datetime_from_filename("test.1234567.csv", regex)
 
     with pytest.raises(Exception):
-        spec.datetime_from_filename("test.09:20:11.csv")
+        spec.datetime_from_filename("test.2018-02-02.csv", regex)
 
     with pytest.raises(Exception):
-        spec.datetime_from_filename("test-12345678.csv")
+        spec.datetime_from_filename("test.09:20:11.csv", regex)
 
-    assert spec.datetime_from_filename("test.20190101.csv") == datetime(2019, 1, 1)
-    assert spec.datetime_from_filename("test.20190101235959.csv") == datetime(2019, 1, 1, 23, 59, 59)
+    with pytest.raises(Exception):
+        spec.datetime_from_filename("test-12345678.csv", regex)
+
+    assert spec.datetime_from_filename("test.20190101.csv", regex) == datetime(2019, 1, 1)
+    assert spec.datetime_from_filename("test.20190101235959.csv", regex) == datetime(2019, 1, 1, 23, 59, 59)
     assert spec.datetime_from_filename("test.20190101235959.csv", r"\.(\d{8})\d+\.") == datetime(2019, 1, 1)
 
     with pytest.raises(Exception):
-        spec.datetime_from_filename("test.12345678.csv")
+        spec.datetime_from_filename("test.12345678.csv", regex)
 
-    def xxx(file, regex=None):      # pylint: disable=unused-argument
+    def xxx(file: str, regex: str) -> str:      # pylint: disable=unused-argument
         m = re.search(r"\.(\d\d\d\d-\d\d-\d\d)\.", file)
-        return m.group(1).replace("-", "") if m else None
+        assert m
+        return m.group(1).replace("-", "")
 
     spec.extract_datetime_from_filename = xxx
-    assert spec.datetime_from_filename("test.2019-02-10.csv") == datetime(2019, 2, 10)
+    assert spec.datetime_from_filename("test.2019-02-10.csv", regex) == datetime(2019, 2, 10)

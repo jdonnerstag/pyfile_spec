@@ -12,6 +12,8 @@ from file_spec.filespec_registry import FileSpecRegistry, FileSpecification
 
 class MySpec(FileSpecification):
     ENABLED = False
+    FILE_PATTERN = "*.dat"
+    FIELDSPECS = []
 
 
 def test_constructor():

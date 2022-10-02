@@ -7,3 +7,4 @@ class M001(FileSpecification):
 
     FILE_PATTERN = ["*.txt"]   # type: ignore
     DATE_FROM_FILENAME_REGEX = None
+    FIELDSPECS = []
