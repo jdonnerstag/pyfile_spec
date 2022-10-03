@@ -17,7 +17,7 @@ class MySpec(FileSpecification):
 
 
 def test_constructor():
-    finder = FileSpecRegistry(Path("./tests/mod_data"))
+    finder = FileSpecRegistry(Path("./tests/file_spec/mod_data"))
     assert finder is not None
     #print(finder, list(finder))
     assert len(finder) == 1
@@ -42,7 +42,7 @@ def test_constructor():
 
 
 def test_finder():
-    finder = FileSpecRegistry(Path("./tests/mod_data"))
+    finder = FileSpecRegistry(Path("./tests/file_spec/mod_data"))
 
     assert finder.find_first("test.txt", datetime.today())
 
