@@ -163,15 +163,13 @@ class FileSpecification:
     COMMENTS: str|bytes|None = None
 
     # Some readers support skipping the first N rows, e.g. Excel, csv, fwf
-    # TODO May that should go into some file format specific spec?
     SKIP_ROWS: int = 0
 
-    # Excel Sheet index or name
-    # TODO Find a way to add reader specific config
-    SHEET: str|int = 0
-
-    # Pandas read_excel index_col argument
-    # TODO Find a way to add reader specific configs, e.g. mixin?
+    # In order to determine the last record before an effective-date, we do
+    # need an index column. Else we are only able to filter records by
+    # effective-date.
+    # The exact meaning might be different per reader. For Excel, please
+    # see Pandas read_excel index_col argument.
     INDEX_COL: str|int|Sequence[int]|None = None
 
     # Assume you want to run the system with an effective-date, different
@@ -195,6 +193,7 @@ class FileSpecification:
     READER: None|str|Type = None
 
     # Additional arguments passed to pandas.read_excel()
+    # Should go into some excel specific filespec
     READ_EXCEL_ARGS: None|dict[str, Any] = None
 
 
@@ -362,19 +361,6 @@ class FileSpecification:
             return 0
 
         if isinstance(data, int):
-            return data
-
-        return self.validation_error(data)
-
-
-    # pylint: disable=invalid-name
-    def validate_SHEET(self, data) -> int|str:
-        """Excel Sheet index or name"""
-
-        if data is None:
-            return 0
-
-        if isinstance(data, (int, str)):
             return data
 
         return self.validation_error(data)

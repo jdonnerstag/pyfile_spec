@@ -17,7 +17,6 @@ class Excel_1(FileSpecification):
 
     READER = "excel"
     FILE_PATTERN = "*.xlsx"
-    SHEET = 0      # The first sheet in the file
 
     SKIP_ROWS = 10
 
@@ -38,7 +37,7 @@ class Excel_1(FileSpecification):
     # TODO May be that is a better approach, then INDEX_COL and SHEET
     # Note that these value will only be applied if not determined elsewhere.
     READ_EXCEL_ARGS = dict(
-        #sheet_name = 0,
+        sheet_name = 0,     # The first sheet in the excel file
         #header = 0,
         #names=None,
         #index_col=None,

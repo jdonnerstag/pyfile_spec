@@ -26,7 +26,6 @@ class ExcelFileReader(BaseFileReader):
     def __init__(self, filespec: FileSpecification):
         super().__init__(filespec)
 
-        self.sheet: str|int = getattr(filespec, "SHEET", 0)
         self.skip_rows: int = getattr(filespec, "SKIP_ROWS", 0)
         self.index_col: None|int|str = getattr(filespec, "INDEX_COL", None)
 
@@ -75,11 +74,12 @@ class ExcelFileReader(BaseFileReader):
                 index_col = self.filespec.INDEX_COL
 
         read_excel_args = getattr(self.filespec, "READ_EXCEL_ARGS", {})
+        sheet_name = read_excel_args.pop("sheet_name", 0)
         data = pd.read_excel(file,
                 usecols = list(self.dtype.keys()) or None,
-                sheet_name = self.sheet,
+                sheet_name = sheet_name,
                 dtype = self.dtype,
-                skiprows = self.filespec.SKIP_ROWS,
+                skiprows = self.filespec.SKIP_ROWS or read_excel_args.get("skiprows", 0),
                 index_col = index_col,
                 **read_excel_args
         )
