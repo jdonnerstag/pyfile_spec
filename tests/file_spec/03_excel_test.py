@@ -35,6 +35,35 @@ class Excel_1(FileSpecification):
     INDEX_COL = None
     PERIOD_DATE_FIELDS = None
 
+    # TODO May be that is a better approach, then INDEX_COL and SHEET
+    # Note that these value will only be applied if not determined elsewhere.
+    READ_EXCEL_ARGS = dict(
+        #sheet_name = 0,
+        #header = 0,
+        #names=None,
+        #index_col=None,
+        #usecols=None,
+        squeeze=None,
+        #dtype=None,
+        engine=None,
+        converters=None,
+        true_values=None,
+        false_values=None,
+        #skiprows=10,
+        nrows=None,
+        na_values=None,
+        keep_default_na=True,
+        na_filter=True,
+        verbose=False,
+        parse_dates=False,
+        date_parser=None,
+        thousands=None,
+        decimal='.',
+        comment=None,
+        skipfooter=0,
+        convert_float=None,
+        storage_options=None
+    )
 
 def test_constructor():
     spec = Excel_1()
@@ -72,7 +101,9 @@ def test_excel_with_effective_date():
     df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(datetime.today()))
     assert len(df.index) == 9
 
-    # Adding the effective date field will remove all rows with empty field values.
+    # Adding the effective date field will remove all rows younger then the effective date.
+    # Since no default value for this column is defined, empty fields are considered NAN,
+    # which are filtered by default. Configure a default value if for a different behavior.
     # All other rows remain effective with default effective == today()
     # Since INDEX_COL is not defined, we are not able to identify the latest.
     spec.EFFECTIVE_DATE_FIELD = "changed"
@@ -215,13 +246,28 @@ class MyExceFileReader(ExcelFileReader):
     """test"""
 
 def test_my_reader():
-
     spec = Excel_1()
 
-    spec.READER = MyExceFileReader
     spec.EFFECTIVE_DATE_FIELD = None
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = None
-    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = MyExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 9
     assert list(df.columns) == list(spec.columns)
+
+
+def test_multi_dimensional():
+    spec = Excel_1()
+
+    spec.FIELDSPECS = []
+    spec.EFFECTIVE_DATE_FIELD = None
+    spec.PERIOD_DATE_FIELDS = None
+    spec.INDEX_COL = [0, 1]
+    spec.SKIP_ROWS = 2
+    df = ExcelFileReader(spec).load(Path("./sample_data/example-multi-dimensional-data.xlsx"), DateFilter())
+    assert len(df.index) == 6
+    assert list(df.columns) == ["A", "B", "C"]
+    assert set(df.index.get_level_values(0)) == set(["dim-1", "dim-2"])
+    df.reset_index(drop=False, inplace=True)
+    assert list(df.columns) == ["lev-1", "lev-2", "A", "B", "C"]
+    assert len(df.index) == 6

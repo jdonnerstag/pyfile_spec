@@ -9,7 +9,7 @@ import inspect
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Any, Pattern, Type
+from typing import Any, Pattern, Type, Sequence
 
 import fwf_db
 
@@ -172,7 +172,7 @@ class FileSpecification:
 
     # Pandas read_excel index_col argument
     # TODO Find a way to add reader specific configs, e.g. mixin?
-    INDEX_COL: int|str|None = None
+    INDEX_COL: str|int|Sequence[int]|None = None
 
     # Assume you want to run the system with an effective-date, different
     # from today(). All data provided or changed after this date, must be ignored.
@@ -193,6 +193,9 @@ class FileSpecification:
 
     # The file reader. Either a string (e.g. "fwf", "excel") or class name
     READER: None|str|Type = None
+
+    # Additional arguments passed to pandas.read_excel()
+    READ_EXCEL_ARGS: None|dict[str, Any] = None
 
 
     def validation_error(self, data):
@@ -378,13 +381,13 @@ class FileSpecification:
 
 
     # pylint: disable=invalid-name
-    def validate_INDEX_COL(self, data) -> int|str:
+    def validate_INDEX_COL(self, data) -> str|int|Sequence[int]|None:
         """Pandas read_excel index_col argument"""
 
         if data is None:
-            return 0
+            return None
 
-        if isinstance(data, (int, str)):
+        if isinstance(data, (str, int, Sequence)):
             return data
 
         return self.validation_error(data)
@@ -450,9 +453,9 @@ class FileSpecification:
 
         assert self.FIELDSPECS is not None
 
-        reader = self.READER
-
+        # TODO Is that correct? Does reader return a FileFieldSpec???
         # The user might provide his own reader implementation
+        reader = self.READER
         if isinstance(reader, Type):
             return reader(self.FIELDSPECS)  # pylint: disable=not-callable
 
@@ -467,6 +470,16 @@ class FileSpecification:
         """The file reader"""
         return data
 
+    # pylint: disable=invalid-name
+    def validate_READ_EXCEL_ARGS(self, data):
+        """Additional pandas.read_excel() arguments"""
+        if data is None:
+            return None
+
+        if isinstance(data, dict):
+            return data
+
+        return self.validation_error(data)
 
     def __init__(self):
         """Constructor"""

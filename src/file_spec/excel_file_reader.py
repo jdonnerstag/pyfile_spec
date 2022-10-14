@@ -54,6 +54,7 @@ class ExcelFileReader(BaseFileReader):
 
         # Post-process the data
         data = self.filter_tail(data, key=self.index_col, sort_col=self.effective_date_field)
+
         return data
 
 
@@ -66,11 +67,21 @@ class ExcelFileReader(BaseFileReader):
         space from column names.
         """
 
+        index_col = None
+        if self.filespec.INDEX_COL is not None:
+            if isinstance(self.filespec.INDEX_COL, str):
+                index_col = self.filespec.columns.index(self.filespec.INDEX_COL)
+            else:
+                index_col = self.filespec.INDEX_COL
+
+        read_excel_args = getattr(self.filespec, "READ_EXCEL_ARGS", {})
         data = pd.read_excel(file,
                 usecols = list(self.dtype.keys()) or None,
                 sheet_name = self.sheet,
                 dtype = self.dtype,
-                skiprows = self.skip_rows
+                skiprows = self.filespec.SKIP_ROWS,
+                index_col = index_col,
+                **read_excel_args
         )
 
         data = data.replace(r'[\s\r\n]+', ' ', regex=True)
@@ -99,7 +110,8 @@ class ExcelFileReader(BaseFileReader):
 
 
     def apply_effective_date_filter(self, data: pd.DataFrame, field: str, effective_date: datetime):
-        # Filter all rows where the field value is None
+        # Explicitly filter all rows where the field value is None
+        # Specific a default-value for the field, if you don't want them to be removed
         data = data[data[field].notna()]
 
         # Filter all rows where the field value is larger/later.
@@ -137,11 +149,11 @@ class ExcelFileReader(BaseFileReader):
         """Sort the dframe by 'sort_col', then group_by by 'key', and finally
         select the last entry in each group."""
 
-        if key:
+        if key is not None and sort_col is not None:
             if sort_col:
                 data = data.sort_values(sort_col, ascending=ascending)
 
-            data = data.groupby(key)
+            data = data.groupby(by=key)
             data = data.tail(1)
             data = data.reset_index()
 
