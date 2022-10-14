@@ -9,8 +9,8 @@ import pandas as pd
 
 import pytest
 
-from file_spec.filespec import FileSpecification, Period, DateFilter
-from file_spec.excel_file_reader import ExceFileReader
+from file_spec import FileSpecification, Period, DateFilter
+from file_spec import ExcelFileReader
 
 
 class Excel_1(FileSpecification):
@@ -40,19 +40,19 @@ def test_constructor():
     spec = Excel_1()
     assert spec
 
-    reader = ExceFileReader(spec)
+    reader = ExcelFileReader(spec)
     assert reader
 
 
 def test_excel():
     spec = Excel_1()
 
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 9   # The excel has 9 rows
     assert set(df.columns) == set(spec.columns)
 
     spec.FIELDSPECS = []    # Pandas can even auto-detect the columns
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 9
     assert "comment" in df.columns     # And "comment" is now in as well.
 
@@ -64,12 +64,12 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = None
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = None
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 9
     assert list(df.columns) == list(spec.columns)
 
     # An effective date of today() is not changing anything, as we have not effective_date defined
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(datetime.today()))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(datetime.today()))
     assert len(df.index) == 9
 
     # Adding the effective date field will remove all rows with empty field values.
@@ -78,14 +78,14 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = None
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 8
 
     # Adding the INDEX_COL allows to identify the latest.
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 4
     df = df.set_index("Name")
     assert df.loc["name-1"].attr_text == "aaaa"
@@ -97,7 +97,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180701))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180701))
     assert len(df.index) == 4
     df = df.set_index("Name")
     assert df.loc["name-1"].attr_text == "aaaa"
@@ -109,7 +109,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180630))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180630))
     assert len(df.index) == 4
     df = df.set_index("Name")
     assert df.loc["name-1"].attr_text == "222"  # Changed
@@ -120,7 +120,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180607))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180607))
     assert len(df.index) == 4
     df = df.set_index("Name")
     assert df.loc["name-1"].attr_text == "222"
@@ -131,7 +131,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180606))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180606))
     assert len(df.index) == 4
     df = df.set_index("Name")
     assert df.loc["name-1"].attr_text == "a111"  # Changed
@@ -142,7 +142,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180605))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180605))
     assert len(df.index) == 3   # No name-1 before the effective date
     df = df.set_index("Name")
     assert df.loc["name-2"].attr_text == "a555"
@@ -152,7 +152,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180430))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180430))
     assert len(df.index) == 1   # Only name-3 was created before
     df = df.set_index("Name")
     assert df.loc["name-3"].attr_text == "a888"
@@ -160,7 +160,7 @@ def test_excel_with_effective_date():
     spec.EFFECTIVE_DATE_FIELD = "changed"
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = "Name"
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180331))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(20180331))
     assert len(df.index) == 0
 
 
@@ -170,26 +170,26 @@ def test_excel_with_period():
     spec.EFFECTIVE_DATE_FIELD = None
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = None
-    orig_df = df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    orig_df = df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df) == 9
     assert list(df.columns) == list(spec.columns)
 
     spec.PERIOD_DATE_FIELDS = Period("valid_from", "valid_until")
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20180101, 20180131))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20180101, 20180131))
     assert len(df.index) == 8
     df = pd.concat([orig_df, df]).drop_duplicates(keep=False)
     assert len(df) == 1
     assert df.iloc[0].attr_text == "666"
 
     spec.PERIOD_DATE_FIELDS = Period("valid_from", "valid_until", inclusive=True)
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20180101, 20181231))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20180101, 20181231))
     assert len(df) == 8
     df = pd.concat([orig_df, df]).drop_duplicates(keep=False)
     assert len(df) == 1
     assert df.iloc[0].attr_text == "666"
 
     spec.PERIOD_DATE_FIELDS = Period("valid_from", "valid_until", inclusive=False)
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20180101, 20181231))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20180101, 20181231))
     assert len(df) == 7
     df = pd.concat([orig_df, df]).drop_duplicates(keep=False)
     assert len(df) == 2
@@ -197,21 +197,21 @@ def test_excel_with_period():
     assert df.iloc[1].attr_text == "666"
 
     spec.PERIOD_DATE_FIELDS = Period("valid_from", "valid_until", inclusive=True)
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20190101, 20191231))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20190101, 20191231))
     assert len(df) == 8
     df = pd.concat([orig_df, df]).drop_duplicates(keep=False)
     assert len(df) == 1
     assert set(df.attr_text.to_list()) == set(["a555"])
 
     spec.PERIOD_DATE_FIELDS = Period("valid_from", "valid_until", inclusive=False)
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20190101, 20191231))
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter(None, 20190101, 20191231))
     assert len(df) == 7
     df = pd.concat([orig_df, df]).drop_duplicates(keep=False)
     assert len(df) == 2
     assert set(df.attr_text.to_list()) == set(["a555", "666"])
 
 
-class MyExceFileReader(ExceFileReader):
+class MyExceFileReader(ExcelFileReader):
     """test"""
 
 def test_my_reader():
@@ -222,6 +222,6 @@ def test_my_reader():
     spec.EFFECTIVE_DATE_FIELD = None
     spec.PERIOD_DATE_FIELDS = None
     spec.INDEX_COL = None
-    df = ExceFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
+    df = ExcelFileReader(spec).load(Path("./sample_data/excel_1.xlsx"), DateFilter())
     assert len(df.index) == 9
     assert list(df.columns) == list(spec.columns)

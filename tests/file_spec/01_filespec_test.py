@@ -8,7 +8,8 @@ from datetime import datetime
 
 import pytest
 
-from file_spec.filespec import FileSpecification, FileSpecificationException, to_date
+from file_spec import FileSpecification
+from file_spec.filespec import FileSpecificationException, to_date
 
 
 DATA = b"""# My comment test

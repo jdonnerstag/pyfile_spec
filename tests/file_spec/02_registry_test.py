@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime
 import pytest
 
-from file_spec.filespec_registry import FileSpecRegistry, FileSpecification
+from file_spec import FileSpecRegistry, FileSpecification
 
 
 class MySpec(FileSpecification):

@@ -13,7 +13,7 @@ from typing import Any, Pattern, Type
 
 import fwf_db
 
-# TODO We somehow need a means to configure allow configs. It's to confusing right now.
+# TODO We somehow need a means to configure allowed configs. It's to confusing right now.
 #      Some list with the names, which can be extended, or something like this.
 
 logger = logging.getLogger(__name__)

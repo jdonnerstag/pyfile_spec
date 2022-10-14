@@ -46,7 +46,6 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         "Programming Language :: Python :: 3 :: Only",
-
     ],
 
     # To provide executable scripts, use entry points in preference to the

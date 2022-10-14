@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
 
 
-class ExceFileReaderException(Exception):
-    """ExceFileReaderException"""
+class ExcelFileReaderException(Exception):
+    """ExcelFileReaderException"""
 
-class ExceFileReader(BaseFileReader):
+class ExcelFileReader(BaseFileReader):
     """Excel File Reader"""
 
     def __init__(self, filespec: FileSpecification):
@@ -85,7 +85,7 @@ class ExceFileReader(BaseFileReader):
                 try:
                     data[name] = data[name].astype(dtype)
                 except ValueError as exc:
-                    raise ExceFileReaderException(
+                    raise ExcelFileReaderException(
                         f"Column '{name}' contains NA values. "
                         f"Either fill all values or configure a default. File={file}") from exc
 
@@ -164,7 +164,7 @@ class ExceFileReader(BaseFileReader):
             obj = obj.replace("-", "")
             return datetime(int(obj[0:4]), int(obj[4:6]), int(obj[6:8]))
 
-        raise ExceFileReaderException(f"Invalid date: {obj}")
+        raise ExcelFileReaderException(f"Invalid date: {obj}")
 
 
     def to_dtype(self, dframe, field, obj):
@@ -174,7 +174,7 @@ class ExceFileReader(BaseFileReader):
         if dtype.name.startswith("datetime64["):
             return self.to_datetime(obj)
 
-        raise ExceFileReaderException(
+        raise ExcelFileReaderException(
             f"Auto-converter for dtype {dtype} not yet supported")
 
 
@@ -198,7 +198,7 @@ class ExceFileReader(BaseFileReader):
             date_from = date.replace(day=1, month=1)
             date_until = date.replace(day=31, month=12)
         else:
-            raise ExceFileReaderException(
+            raise ExcelFileReaderException(
                 f"Invalid string for 'range': {range_str}")
 
         return (date_from, date_until)

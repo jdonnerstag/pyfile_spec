@@ -6,7 +6,7 @@
 
 import logging
 
-from .excel_file_reader import ExceFileReader
+from .excel_file_reader import ExcelFileReader
 from .fwf_file_reader import FWFFileReader
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class GenericFileReader(object):
     """
 
     _map = {
-        "excel": ExceFileReader,
+        "excel": ExcelFileReader,
         "fwf": FWFFileReader,
         "csv": None,    # csv_reader,
     }

@@ -8,8 +8,8 @@ from datetime import datetime
 import pytest
 import fwf_db
 
-from file_spec.filespec import FileSpecification, Period, DateFilter
-from file_spec.fwf_file_reader import FWFFileReader
+from file_spec import FileSpecification, Period, DateFilter
+from file_spec import FWFFileReader
 
 
 DATA = b"""# My comment test

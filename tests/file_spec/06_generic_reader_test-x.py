@@ -8,8 +8,8 @@ import sys
 import io
 from datetime import datetime
 
-from file_readers.filespec import FileSpecification
-from file_readers.generic_reader import GenericFileReader
+from file_spec import FileSpecification
+from file_spec.generic_reader import GenericFileReader
 
 
 class Excel_1(FileSpecification):

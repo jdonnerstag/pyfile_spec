@@ -9,8 +9,8 @@ import io
 import glob
 from datetime import datetime
 
-from file_readers.filespec import FileSpecification
-from file_readers.fwf_file_reader import FWFFileReader
+from file_spec import FileSpecification
+from file_spec import FWFFileReader
 from fwf_db.fwf_line import FWFLine
 
 
